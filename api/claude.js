@@ -26,7 +26,7 @@ const ANTHROPIC_VERSION = '2023-06-01';
 // Allowed origins — add your Vercel deployment URL here after first deploy
 // e.g. 'https://your-project.vercel.app'
 const ALLOWED_ORIGINS = [
-  'https://your-project.vercel.app',   // ← replace after first deploy
+  'https://module-design-flow.vercel.app/',   // ← replace after first deploy
   'http://localhost:3000',             // local dev
   'http://localhost:5500',             // VS Code Live Server
 ];
