@@ -1,0 +1,1558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Part 2 — Developer Discipline: Module Addition</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&display=swap');
+
+:root {
+  --bg: #080910;
+  --surface: #0c0d1a;
+  --card: #10111e;
+  --card2: #14152a;
+  --border: #1a1b30;
+  --border2: #232440;
+  --llm: #a78bfa;
+  --agent: #fb923c;
+  --dev: #34d399;
+  --danger: #f87171;
+  --warn: #fbbf24;
+  --info: #38bdf8;
+  --llm-dim: rgba(167,139,250,0.07);
+  --agent-dim: rgba(251,146,60,0.07);
+  --dev-dim: rgba(52,211,153,0.07);
+  --danger-dim: rgba(248,113,113,0.07);
+  --warn-dim: rgba(251,191,36,0.06);
+  --text: #e2e4f8;
+  --muted: #42446a;
+  --muted2: #7a7aaa;
+  --mono: 'JetBrains Mono', monospace;
+  --serif: 'Cormorant Garamond', serif;
+}
+
+/* ── CONSEQUENCES TAB ── */
+.run-compare-btn {
+  padding: 13px 30px; background: linear-gradient(135deg, var(--llm), var(--agent));
+  color: #fff; border: none; border-radius: 8px; font-family: var(--mono);
+  font-size: 12px; font-weight: 700; cursor: pointer; letter-spacing: 1px;
+  transition: all 0.2s; display: flex; align-items: center; gap: 10px;
+}
+.run-compare-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+.run-compare-btn:disabled { background: #1a1a30; color: #333355; cursor: not-allowed; transform: none; }
+
+.compare-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;
+}
+@media (max-width: 800px) { .compare-grid { grid-template-columns: 1fr; } }
+
+.cg-col { display: flex; flex-direction: column; gap: 0; border-radius: 10px; overflow: hidden; border: 1px solid; }
+.cg-col.llm-col { border-color: rgba(167,139,250,0.25); }
+.cg-col.agent-col { border-color: rgba(251,146,60,0.25); }
+
+.cg-hdr { padding: 14px 18px; font-size: 11px; font-weight: 700; letter-spacing: 1px; display: flex; align-items: center; gap: 8px; }
+.llm-col .cg-hdr { background: var(--llm-dim); color: var(--llm); border-bottom: 1px solid rgba(167,139,250,0.15); }
+.agent-col .cg-hdr { background: var(--agent-dim); color: var(--agent); border-bottom: 1px solid rgba(251,146,60,0.15); }
+.cg-hdr .step-badge {
+  margin-left: auto; font-size: 9px; padding: 2px 8px; border-radius: 8px; font-weight: 700;
+}
+.llm-col .step-badge { background: rgba(167,139,250,0.15); color: var(--llm); }
+.agent-col .step-badge { background: rgba(251,146,60,0.15); color: var(--agent); }
+
+.cg-body { padding: 16px 18px; background: var(--card); flex: 1; min-height: 200px; }
+.cg-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 200px; gap: 10px; color: var(--muted); font-size: 11px; }
+.cg-loading .loader { width: 20px; height: 20px; border-width: 2px; }
+.loader { display: inline-block; border: 2px solid rgba(255,255,255,0.08); border-top-color: currentColor; border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.cg-reasoning { font-size: 11px; line-height: 1.8; color: var(--muted2); border-left: 2px solid var(--border2); padding-left: 14px; margin-bottom: 14px; }
+.cg-reasoning .r-block { margin-bottom: 10px; }
+.cg-reasoning .r-label { font-size: 9px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; margin-bottom: 3px; }
+
+.cg-file-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+.cg-file { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 4px; font-size: 11px; background: var(--card2); }
+.cg-file .f-path { color: var(--info); flex: 1; }
+.cg-file .f-action { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; }
+.llm-col .f-action { background: var(--llm-dim); color: var(--llm); }
+.agent-col .f-action { background: var(--agent-dim); color: var(--agent); }
+.cg-file .f-risk { font-size: 9px; color: var(--danger); }
+
+.cg-problem { margin-top: 8px; padding: 8px 12px; background: var(--danger-dim); border: 1px solid rgba(248,113,113,0.15); border-radius: 5px; font-size: 11px; color: var(--danger); line-height: 1.6; }
+
+/* comparison table */
+.comp-table { border: 1px solid var(--border2); border-radius: 10px; overflow: hidden; margin-bottom: 24px; }
+.ct-hdr { display: grid; grid-template-columns: 2fr 1fr 1fr; background: var(--card2); padding: 11px 16px; border-bottom: 1px solid var(--border); }
+.ct-hdr-cell { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+.ct-hdr-cell.llm-h { color: var(--llm); } .ct-hdr-cell.agent-h { color: var(--agent); }
+.ct-row { display: grid; grid-template-columns: 2fr 1fr 1fr; padding: 11px 16px; border-bottom: 1px solid var(--border); align-items: center; }
+.ct-row:last-child { border-bottom: none; }
+.ct-row:hover { background: rgba(255,255,255,0.015); }
+.ct-metric { font-size: 11px; color: var(--text); }
+.ct-metric small { display: block; font-size: 10px; color: var(--muted); margin-top: 2px; }
+.ct-val { font-size: 11px; text-align: center; }
+.ct-val.good { color: var(--dev); font-weight: 700; }
+.ct-val.bad  { color: var(--danger); font-weight: 700; }
+.ct-val.warn { color: var(--warn); }
+
+/* verdict */
+.verdict-card {
+  background: linear-gradient(135deg, rgba(167,139,250,0.06) 0%, rgba(251,146,60,0.06) 100%);
+  border: 1px solid var(--border2); border-radius: 10px; padding: 24px; margin-bottom: 24px;
+}
+.verdict-title { font-family: var(--serif); font-size: 22px; color: #f0f4ff; margin-bottom: 12px; }
+.verdict-body { font-size: 11px; color: var(--muted2); line-height: 1.85; }
+.verdict-body .hi-llm { color: var(--llm); font-weight: 700; }
+.verdict-body .hi-agent { color: var(--agent); font-weight: 700; }
+.verdict-body .hi-danger { color: var(--danger); font-weight: 700; }
+.verdict-body .hi-good { color: var(--dev); font-weight: 700; }
+
+
+/* ── PIPELINE ── */
+.pipeline {
+  display: flex; align-items: center; padding: 0 36px;
+  background: var(--surface); border-bottom: 1px solid var(--border); overflow-x: auto;
+}
+.ps { display: flex; align-items: center; gap: 8px; padding: 12px 16px 12px 0; flex-shrink: 0; }
+.ps-arrow { color: var(--border2); font-size: 14px; margin: 0 2px; }
+.ps-num { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; }
+.done .ps-num { background: rgba(52,211,153,0.12); color: var(--dev); border: 1px solid rgba(52,211,153,0.2); }
+.now  .ps-num { background: rgba(52,211,153,0.15); color: var(--dev); border: 1px solid rgba(52,211,153,0.3); box-shadow: 0 0 10px rgba(52,211,153,0.15); }
+.ps-tag { font-size: 8px; letter-spacing: 2px; text-transform: uppercase; }
+.done .ps-tag { color: var(--dev); } .now .ps-tag { color: var(--dev); }
+.ps-name { font-size: 10px; font-weight: 600; }
+.done .ps-name { color: #5577aa; } .now .ps-name { color: var(--text); }
+
+/* ── HEADER ── */
+header {
+  padding: 40px 36px 32px; border-bottom: 1px solid var(--border);
+  position: relative; overflow: hidden;
+  background: linear-gradient(135deg, #0a0d20 0%, #080910 50%);
+}
+header::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--dev), transparent); opacity: 0.35;
+}
+header::after {
+  content: ''; position: absolute; bottom: -60px; right: -60px;
+  width: 300px; height: 300px;
+  background: radial-gradient(circle, rgba(52,211,153,0.04) 0%, transparent 70%);
+  pointer-events: none;
+}
+.eyebrow { font-size: 9px; letter-spacing: 4px; text-transform: uppercase; color: var(--dev); opacity: 0.7; margin-bottom: 12px; }
+h1 { font-family: var(--serif); font-size: clamp(28px, 4vw, 48px); font-weight: 400; color: #f0f4ff; line-height: 1.1; }
+h1 em { color: var(--dev); font-style: italic; }
+.subtitle { margin-top: 12px; font-size: 11px; color: var(--muted2); line-height: 1.8; max-width: 660px; }
+
+/* difference callout */
+.diff-callout {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 24px; max-width: 700px;
+}
+@media (max-width: 600px) { .diff-callout { grid-template-columns: 1fr; } }
+.diff-col {
+  padding: 12px 16px; border-radius: 8px; border: 1px solid; font-size: 11px; line-height: 1.65;
+}
+.diff-col.p1 { border-color: rgba(56,189,248,0.2); background: rgba(56,189,248,0.04); }
+.diff-col.p2 { border-color: rgba(52,211,153,0.2); background: rgba(52,211,153,0.04); }
+.diff-col-label { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; }
+.diff-col.p1 .diff-col-label { color: var(--info); }
+.diff-col.p2 .diff-col-label { color: var(--dev); }
+.diff-col-text { color: var(--muted2); }
+
+/* ── NAV TABS ── */
+.nav-tabs {
+  display: flex; background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 0 36px; overflow-x: auto;
+}
+.nav-tab {
+  padding: 15px 22px; font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent;
+  transition: all 0.2s; white-space: nowrap; display: flex; align-items: center; gap: 8px;
+}
+.nav-tab:hover { color: var(--text); }
+.nav-tab.active { color: var(--dev); border-bottom-color: var(--dev); }
+.tab-dot { width: 7px; height: 7px; border-radius: 50%; }
+
+/* ── CONTENT ── */
+.content { max-width: 1060px; padding: 36px; }
+.sec { display: none; animation: fi 0.25s ease; }
+.sec.active { display: block; }
+@keyframes fi { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+
+.sec-title { font-family: var(--serif); font-size: 30px; font-weight: 400; margin-bottom: 8px; line-height: 1.2; }
+.sec-sub { font-size: 11px; color: var(--muted2); line-height: 1.75; margin-bottom: 32px; max-width: 620px; }
+
+/* ── DISCIPLINE CARDS (the core pattern) ── */
+.disc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 28px; }
+@media (max-width: 740px) { .disc-grid { grid-template-columns: 1fr; } }
+
+.disc-card {
+  background: var(--card); border: 1px solid var(--border2); border-radius: 10px; overflow: hidden;
+  transition: border-color 0.2s;
+}
+.disc-card:hover { border-color: rgba(52,211,153,0.2); }
+.disc-card-hdr {
+  padding: 13px 18px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px; background: var(--card2);
+}
+.disc-num {
+  width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700;
+}
+.disc-title { font-size: 12px; font-weight: 700; color: var(--text); }
+.disc-body { padding: 16px 18px; }
+.disc-why { font-size: 11px; color: var(--muted2); line-height: 1.7; margin-bottom: 12px; }
+
+.compare { border-radius: 6px; overflow: hidden; margin-top: 10px; }
+.cmp-row { display: grid; grid-template-columns: 80px 1fr; }
+.cmp-label {
+  padding: 8px 10px; font-size: 9px; letter-spacing: 1px; text-transform: uppercase;
+  font-weight: 700; display: flex; align-items: flex-start; padding-top: 10px;
+}
+.cmp-bad  { background: var(--danger-dim); } .cmp-bad  .cmp-label { color: var(--danger); border-right: 1px solid rgba(248,113,113,0.15); }
+.cmp-good { background: var(--dev-dim); }   .cmp-good .cmp-label { color: var(--dev);    border-right: 1px solid rgba(52,211,153,0.15); }
+.cmp-body { padding: 10px 12px; font-size: 11px; line-height: 1.65; color: var(--muted2); }
+.cmp-bad  .cmp-body { border-top: 1px solid rgba(248,113,113,0.08); }
+.cmp-good .cmp-body { border-top: 1px solid rgba(52,211,153,0.08); }
+.cmp-body strong { color: var(--text); }
+.cmp-body .hi { color: var(--dev); }
+.cmp-body .bad { color: var(--danger); }
+.cmp-body .warn { color: var(--warn); }
+
+/* ── FLOW COMPARISON ── */
+.flow-compare {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+  border: 1px solid var(--border2); border-radius: 10px; overflow: hidden; margin-bottom: 28px;
+}
+@media (max-width: 700px) { .flow-compare { grid-template-columns: 1fr; } }
+.flow-col { padding: 20px; }
+.flow-col.bad-flow { background: var(--danger-dim); border-right: 1px solid rgba(248,113,113,0.1); }
+.flow-col.good-flow { background: var(--dev-dim); }
+.flow-col-hdr { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 14px; }
+.flow-col.bad-flow .flow-col-hdr { color: var(--danger); }
+.flow-col.good-flow .flow-col-hdr { color: var(--dev); }
+.flow-step {
+  display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px;
+  font-size: 11px; color: var(--muted2); line-height: 1.6;
+}
+.flow-arrow { color: var(--muted); font-size: 10px; flex-shrink: 0; padding-top: 2px; }
+.flow-step strong { color: var(--text); }
+.flow-step .bad { color: var(--danger); }
+.flow-step .good { color: var(--dev); }
+.flow-step .warn { color: var(--warn); }
+
+/* ── WHO OWNS WHAT TABLE ── */
+.ownership-table {
+  border: 1px solid var(--border2); border-radius: 10px; overflow: hidden; margin-bottom: 28px;
+}
+.ot-hdr {
+  display: grid; grid-template-columns: 2fr 1fr 1fr 1fr;
+  background: var(--card2); border-bottom: 1px solid var(--border);
+  padding: 10px 16px;
+}
+.ot-hdr-cell { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+.ot-row {
+  display: grid; grid-template-columns: 2fr 1fr 1fr 1fr;
+  padding: 11px 16px; border-bottom: 1px solid var(--border);
+  align-items: center; transition: background 0.15s;
+}
+.ot-row:last-child { border-bottom: none; }
+.ot-row:hover { background: rgba(255,255,255,0.02); }
+.ot-situation { font-size: 11px; color: var(--text); }
+.ot-situation small { display: block; font-size: 10px; color: var(--muted2); margin-top: 2px; }
+.ot-cell { display: flex; justify-content: center; }
+.owner-badge {
+  padding: 3px 10px; border-radius: 10px; font-size: 10px; font-weight: 700;
+  letter-spacing: 0.5px; white-space: nowrap;
+}
+.ob-llm   { background: var(--llm-dim);   color: var(--llm);   border: 1px solid rgba(167,139,250,0.15); }
+.ob-agent { background: var(--agent-dim); color: var(--agent); border: 1px solid rgba(251,146,60,0.15); }
+.ob-dev   { background: var(--dev-dim);   color: var(--dev);   border: 1px solid rgba(52,211,153,0.15); }
+.ob-none  { background: var(--card2);     color: var(--muted); border: 1px solid var(--border); }
+.ob-stop  { background: var(--danger-dim);color: var(--danger);border: 1px solid rgba(248,113,113,0.15); }
+
+/* ── CHECKLIST ── */
+.checklist-section { margin-bottom: 28px; }
+.checklist-title {
+  font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: var(--muted);
+  margin-bottom: 14px; display: flex; align-items: center; gap: 10px;
+}
+.checklist-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.checklist-title span { color: var(--dev); }
+
+.checklist-card {
+  background: var(--card); border: 1px solid var(--border2); border-radius: 10px;
+  overflow: hidden; margin-bottom: 12px;
+}
+.cl-hdr {
+  padding: 11px 18px; background: var(--card2); border-bottom: 1px solid var(--border);
+  font-size: 10px; font-weight: 700; letter-spacing: 1px;
+  display: flex; align-items: center; gap: 8px;
+}
+.cl-hdr.llm-hdr { color: var(--llm); }
+.cl-hdr.agent-hdr { color: var(--agent); }
+.cl-hdr.dev-hdr { color: var(--dev); }
+.cl-hdr.warn-hdr { color: var(--warn); }
+.cl-progress { margin-left: auto; font-size: 10px; color: var(--muted); font-weight: 400; }
+
+.cl-item {
+  display: flex; align-items: flex-start; gap: 12px; padding: 11px 18px;
+  border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.15s;
+  font-size: 11px; color: var(--muted2); line-height: 1.6;
+}
+.cl-item:last-child { border-bottom: none; }
+.cl-item:hover { background: rgba(255,255,255,0.02); }
+.cl-item.checked { color: var(--muted); }
+.cl-box {
+  width: 16px; height: 16px; border-radius: 3px; border: 1px solid var(--border2);
+  flex-shrink: 0; margin-top: 1px; display: flex; align-items: center; justify-content: center;
+  font-size: 10px; transition: all 0.2s; background: var(--card2);
+}
+.cl-item.checked .cl-box { background: var(--dev); border-color: var(--dev); color: #000; font-weight: 700; }
+.cl-item.checked > span:last-child { text-decoration: line-through; opacity: 0.5; }
+.cl-item .tag {
+  display: inline-block; padding: 1px 6px; border-radius: 6px; font-size: 9px;
+  font-weight: 700; margin-left: 6px; vertical-align: middle;
+}
+.tag-blocker { background: var(--danger-dim); color: var(--danger); }
+.tag-warn    { background: var(--warn-dim);   color: var(--warn); }
+.tag-llm     { background: var(--llm-dim);    color: var(--llm); }
+.tag-agent   { background: var(--agent-dim);  color: var(--agent); }
+
+/* ── ANTI-PATTERNS ── */
+.antipattern-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px; }
+.ap-card {
+  background: var(--card); border: 1px solid var(--border2); border-left: 3px solid var(--danger);
+  border-radius: 8px; overflow: hidden;
+}
+.ap-hdr {
+  padding: 11px 16px; background: var(--danger-dim); border-bottom: 1px solid rgba(248,113,113,0.1);
+  display: flex; align-items: center; gap: 10px;
+}
+.ap-icon { font-size: 14px; }
+.ap-name { font-size: 11px; font-weight: 700; color: var(--danger); }
+.ap-body { padding: 14px 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 600px) { .ap-body { grid-template-columns: 1fr; } }
+.ap-what { font-size: 11px; color: var(--muted2); line-height: 1.65; }
+.ap-what strong { color: var(--text); display: block; margin-bottom: 4px; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
+.ap-what .fix { color: var(--dev); margin-top: 6px; display: block; }
+
+/* ── QUICK REF ── */
+.quick-ref {
+  background: var(--card); border: 1px solid var(--border2); border-radius: 10px; overflow: hidden;
+}
+.qr-hdr { padding: 14px 20px; background: var(--card2); border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 700; color: var(--text); }
+.qr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.qr-cell { padding: 14px 16px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.qr-cell:nth-child(3n) { border-right: none; }
+.qr-sit { font-size: 10px; color: var(--muted); margin-bottom: 5px; letter-spacing: 0.5px; }
+.qr-act { font-size: 11px; color: var(--muted2); line-height: 1.5; }
+.qr-mode {
+  display: inline-block; margin-top: 6px; padding: 2px 8px; border-radius: 8px;
+  font-size: 10px; font-weight: 700;
+}
+.m-llm   { background: var(--llm-dim);   color: var(--llm); }
+.m-agent { background: var(--agent-dim); color: var(--agent); }
+.m-dev   { background: var(--dev-dim);   color: var(--dev); }
+.m-stop  { background: var(--danger-dim);color: var(--danger); }
+.m-both  { background: rgba(167,139,250,0.07); color: var(--llm); border: 1px solid rgba(251,146,60,0.2); }
+
+/* ── AGENT AT STEP 4 PIPELINE ── */
+.pa-step {
+  flex: 1; min-width: 120px; padding: 14px 12px; border-radius: 8px; border: 1px solid;
+  background: var(--card); text-align: center;
+}
+.pa-num {
+  width: 28px; height: 28px; border-radius: 50%; border: 1px solid;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; margin: 0 auto 8px;
+}
+.pa-label { font-size: 10px; font-weight: 700; letter-spacing: 1px; margin-bottom: 5px; }
+.pa-desc  { font-size: 10px; color: var(--muted2); line-height: 1.4; }
+.pa-arrow { font-size: 20px; color: var(--border2); padding: 0 4px; flex-shrink: 0; align-self: center; }
+.pa-output { border: 1px solid var(--border2); border-radius: 10px; overflow: hidden; margin-bottom: 20px; }
+.pa-output-hdr {
+  padding: 12px 18px; display: flex; align-items: center; gap: 10px;
+  font-size: 10px; font-weight: 700; letter-spacing: 1px; border-bottom: 1px solid var(--border);
+}
+.pa-output-body { padding: 16px 18px; background: var(--card); font-size: 11px; line-height: 1.75; color: var(--muted2); }
+.pa-badge { margin-left: auto; font-size: 9px; padding: 2px 8px; border-radius: 8px; font-weight: 700; }
+.pa-warning {
+  padding: 10px 14px; background: var(--danger-dim); border: 1px solid rgba(248,113,113,0.2);
+  border-radius: 6px; font-size: 11px; color: var(--danger); margin-top: 10px; line-height: 1.65;
+}
+.pa-good {
+  padding: 10px 14px; background: var(--dev-dim); border: 1px solid rgba(52,211,153,0.15);
+  border-radius: 6px; font-size: 11px; color: var(--dev); margin-top: 10px; line-height: 1.65;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: var(--mono); min-height: 100%; }
+</style>
+</head>
+<body>
+
+<!-- PIPELINE -->
+<div class="pipeline">
+  <div class="ps done"><div class="ps-num">✓</div><div class="ps-info"><div class="ps-tag">Part 1</div><div class="ps-name">Project Design</div></div></div>
+  <div class="ps-arrow">›</div>
+  <div class="ps done"><div class="ps-num">✓</div><div class="ps-info"><div class="ps-tag">Part 2</div><div class="ps-name">Module Flow</div></div></div>
+  <div class="ps-arrow">›</div>
+  <div class="ps now"><div class="ps-num">★</div><div class="ps-info"><div class="ps-tag">Part 2 — Discipline</div><div class="ps-name">Module Addition Rules</div></div></div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="eyebrow">Part 2 // Developer Discipline</div>
+  <h1>Adding Modules to a<br><em>Living Codebase</em></h1>
+  <p class="subtitle">New module development has different failure modes than greenfield projects. The codebase has history, drift, and established patterns that the new module must respect — or explicitly break with a documented reason.</p>
+
+  <div class="diff-callout">
+    <div class="diff-col p1">
+      <div class="diff-col-label">Part 1 — New Project</div>
+      <div class="diff-col-text">Clean slate. LLM and agent work from blueprints. Main risk: premature execution before design is complete.</div>
+    </div>
+    <div class="diff-col p2">
+      <div class="diff-col-label">Part 2 — Existing Project</div>
+      <div class="diff-col-text">Codebase has drifted. New module inherits the real state, not the intended state. Main risk: building on a broken foundation.</div>
+    </div>
+  </div>
+</header>
+
+<!-- NAV -->
+<div class="nav-tabs">
+  <div class="nav-tab active" onclick="switchSec('before', this)">
+    <span class="tab-dot" style="background:var(--warn);box-shadow:0 0 5px var(--warn)"></span>
+    Before You Start
+  </div>
+  <div class="nav-tab" onclick="switchSec('during', this)">
+    <span class="tab-dot" style="background:var(--dev);box-shadow:0 0 5px var(--dev)"></span>
+    During Development
+  </div>
+  <div class="nav-tab" onclick="switchSec('antipatterns', this)">
+    <span class="tab-dot" style="background:var(--danger);box-shadow:0 0 5px var(--danger)"></span>
+    Anti-Patterns
+  </div>
+  <div class="nav-tab" onclick="switchSec('quickref', this)">
+    <span class="tab-dot" style="background:var(--llm);box-shadow:0 0 5px var(--llm)"></span>
+    Quick Reference
+  </div>
+  <div class="nav-tab" onclick="switchSec('consequences', this)">
+    <span class="tab-dot" style="background:var(--danger);box-shadow:0 0 5px var(--agent)"></span>
+    Consequences
+  </div>
+  <div class="nav-tab" onclick="switchSec('pipeline-agent', this)">
+    <span class="tab-dot" style="background:var(--agent);box-shadow:0 0 5px var(--agent)"></span>
+    Agent at Step 4
+  </div>
+</div>
+
+<div class="content">
+
+  <!-- ═══════════ BEFORE YOU START ═══════════ -->
+  <div class="sec active" id="sec-before">
+    <div class="sec-title" style="color:var(--warn)">Before You Write a Single Line</div>
+    <p class="sec-sub">The biggest mistakes in module addition happen before development starts. These disciplines prevent you from building on a foundation that can't support the new module.</p>
+
+    <!-- Wrong vs Right flow -->
+    <div class="flow-compare">
+      <div class="flow-col bad-flow">
+        <div class="flow-col-hdr">✗ What Most Developers Do</div>
+        <div class="flow-step"><span class="flow-arrow">→</span><span>"I need Admin Dashboard" → <span class="bad">ask agent to start building immediately</span></span></div>
+        <div class="flow-step"><span class="flow-arrow">→</span><span>Agent reads drifted codebase → <span class="warn">makes assumptions about what exists</span></span></div>
+        <div class="flow-step"><span class="flow-arrow">→</span><span>Admin built on top of <span class="bad">missing AuthGuard, no hooks, no types</span></span></div>
+        <div class="flow-step"><span class="flow-arrow">→</span><span><span class="bad">Silent failures in production.</span> Auth bypassed. Payment logic duplicated. Types missing.</span></div>
+        <div class="flow-step"><span class="flow-arrow">→</span><span>10+ iteration cycles to untangle what was actually wrong</span></div>
+      </div>
+      <div class="flow-col good-flow">
+        <div class="flow-col-hdr">✓ The Right Approach</div>
+        <div class="flow-step"><span class="flow-arrow">→</span><span>"I need Admin Dashboard" → <span class="good">LLM designs theoretically first</span></span></div>
+        <div class="flow-step"><span class="flow-arrow">→</span><span><span class="good">Agent audits reality</span> against the theoretical design</span></div>
+        <div class="flow-step"><span class="flow-arrow">→</span><span><span class="good">Developer reviews gaps</span> — decides fix or accept</span></div>
+        <div class="flow-step"><span class="flow-arrow">→</span><span>LLM <span class="good">redesigns for reality</span> + gap decisions</span></div>
+        <div class="flow-step"><span class="flow-arrow">→</span><span>Agent executes with <span class="good">complete, unambiguous package</span></span></div>
+      </div>
+    </div>
+
+    <!-- Rules -->
+    <div class="disc-grid">
+
+      <div class="disc-card">
+        <div class="disc-card-hdr">
+          <div class="disc-num" style="background:var(--warn-dim);color:var(--warn);border:1px solid rgba(251,191,36,0.2);">1</div>
+          <div class="disc-title">Run the LLM→Agent→LLM flow — always</div>
+        </div>
+        <div class="disc-body">
+          <div class="disc-why">Every new module, no matter how small. The three-step flow is not optional — it is the discipline. Skipping it means the agent works from assumptions, not facts.</div>
+          <div class="compare">
+            <div class="cmp-row cmp-bad"><div class="cmp-label">✗</div><div class="cmp-body">"It's just a small feature, I'll just ask the agent to add it"</div></div>
+            <div class="cmp-row cmp-good"><div class="cmp-label">✓</div><div class="cmp-body">Even a single new hook: <span class="hi">LLM designs it → Agent checks what hooks exist → LLM confirms approach</span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="disc-card">
+        <div class="disc-card-hdr">
+          <div class="disc-num" style="background:var(--warn-dim);color:var(--warn);border:1px solid rgba(251,191,36,0.2);">2</div>
+          <div class="disc-title">Resolve blockers before building</div>
+        </div>
+        <div class="disc-body">
+          <div class="disc-why">If the Agent gap report flags a BLOCKER, that is not a suggestion — it is a prerequisite. AuthGuard missing means Admin route protection is impossible to do correctly.</div>
+          <div class="compare">
+            <div class="cmp-row cmp-bad"><div class="cmp-label">✗</div><div class="cmp-body"><span class="bad">Build Admin first, add AuthGuard later</span> → Admin ships with no route protection → security incident</div></div>
+            <div class="cmp-row cmp-good"><div class="cmp-label">✓</div><div class="cmp-body"><span class="hi">Part A executes first</span> (blockers), then Part B (new module). Always in that sequence.</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="disc-card">
+        <div class="disc-card-hdr">
+          <div class="disc-num" style="background:var(--warn-dim);color:var(--warn);border:1px solid rgba(251,191,36,0.2);">3</div>
+          <div class="disc-title">You own the gap decisions — not the LLM</div>
+        </div>
+        <div class="disc-body">
+          <div class="disc-why">The LLM surfaces gaps. The Agent quantifies them. But the developer decides which to fix and which to accept. Never let the LLM silently absorb a gap decision into the design.</div>
+          <div class="compare">
+            <div class="cmp-row cmp-bad"><div class="cmp-label">✗</div><div class="cmp-body">LLM says "I'll work around the missing types" → <span class="bad">gap accepted silently, no record, no decision trail</span></div></div>
+            <div class="cmp-row cmp-good"><div class="cmp-label">✓</div><div class="cmp-body">Every gap gets an explicit decision: <span class="hi">fix or accept</span>. Accepted risks are logged in the execution package.</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="disc-card">
+        <div class="disc-card-hdr">
+          <div class="disc-num" style="background:var(--warn-dim);color:var(--warn);border:1px solid rgba(251,191,36,0.2);">4</div>
+          <div class="disc-title">Commit the current state before anything</div>
+        </div>
+        <div class="disc-body">
+          <div class="disc-why">Before any remediation or new module work begins, commit everything that currently exists — even the drifted, imperfect state. You need a clean rollback point.</div>
+          <div class="compare">
+            <div class="cmp-row cmp-bad"><div class="cmp-label">✗</div><div class="cmp-body">Start remediation on uncommitted work → something breaks → <span class="bad">no clean state to return to</span></div></div>
+            <div class="cmp-row cmp-good"><div class="cmp-label">✓</div><div class="cmp-body"><code style="color:var(--dev)">git commit -m "chore: snapshot before admin module"</code> → then begin Part A</div></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Before checklist -->
+    <div class="checklist-section">
+      <div class="checklist-title"><span>★</span> Pre-Module Checklist — Complete Before Any Code</div>
+      <div class="checklist-card">
+        <div class="cl-hdr warn-hdr">
+          Before starting the LLM→Agent→LLM flow
+          <span class="cl-progress" id="cp-before">0 / 6</span>
+        </div>
+        <div class="cl-item" onclick="tick(this,'before')"><div class="cl-box"></div><span>Committed current codebase state — clean rollback point exists <span class="tag tag-blocker">must</span></span></div>
+        <div class="cl-item" onclick="tick(this,'before')"><div class="cl-box"></div><span>Have the original Part 1 blueprint JSON — LLM needs this as reference <span class="tag tag-llm">LLM</span></span></div>
+        <div class="cl-item" onclick="tick(this,'before')"><div class="cl-box"></div><span>Can describe the new module clearly in 2-3 sentences with specific features required</span></div>
+        <div class="cl-item" onclick="tick(this,'before')"><div class="cl-box"></div><span>Know which existing modules the new module will need to interact with</span></div>
+        <div class="cl-item" onclick="tick(this,'before')"><div class="cl-box"></div><span>Have the actual file tree ready for the agent <span class="tag tag-agent">Agent</span> — run <code style="color:var(--agent)">tree src/</code> in terminal</span></div>
+        <div class="cl-item" onclick="tick(this,'before')"><div class="cl-box"></div><span>Decided: is this the right time to add this module, or are there unresolved issues first?</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════ DURING DEVELOPMENT ═══════════ -->
+  <div class="sec" id="sec-during">
+    <div class="sec-title" style="color:var(--dev)">During Development</div>
+    <p class="sec-sub">Once the execution package is ready and Part A remediation is complete, these disciplines keep the new module consistent with the rest of the codebase.</p>
+
+    <div class="disc-grid">
+
+      <div class="disc-card">
+        <div class="disc-card-hdr">
+          <div class="disc-num" style="background:var(--dev-dim);color:var(--dev);border:1px solid rgba(52,211,153,0.2);">1</div>
+          <div class="disc-title">Follow the patterns that actually exist</div>
+        </div>
+        <div class="disc-body">
+          <div class="disc-why">The new module must match how the existing codebase actually works — not how the blueprint said it would work. If auth components are in lowercase folders, Admin goes in a capitalised folder with a documented reason.</div>
+          <div class="compare">
+            <div class="cmp-row cmp-bad"><div class="cmp-label">✗</div><div class="cmp-body">LLM generates Admin with barrel index.ts files — <span class="bad">none exist elsewhere, now Admin is inconsistent</span></div></div>
+            <div class="cmp-row cmp-good"><div class="cmp-label">✓</div><div class="cmp-body">Tell agent: <span class="hi">"Match existing patterns in Dashboard/ folder — no barrel files, PascalCase components"</span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="disc-card">
+        <div class="disc-card-hdr">
+          <div class="disc-num" style="background:var(--dev-dim);color:var(--dev);border:1px solid rgba(52,211,153,0.2);">2</div>
+          <div class="disc-title">Never reuse logic — extract shared hooks</div>
+        </div>
+        <div class="disc-body">
+          <div class="disc-why">If the new module needs payment or subscription logic that currently sits inline in another component, extract it to a shared hook first. Two components sharing inline logic is two sources of truth waiting to diverge.</div>
+          <div class="compare">
+            <div class="cmp-row cmp-bad"><div class="cmp-label">✗</div><div class="cmp-body">Admin copies subscription logic from Checkout.tsx → <span class="bad">payment logic now exists in two places</span></div></div>
+            <div class="cmp-row cmp-good"><div class="cmp-label">✓</div><div class="cmp-body">Part A extracts <span class="hi">useSubscription.ts</span> → Admin and Checkout both import from single source</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="disc-card">
+        <div class="disc-card-hdr">
+          <div class="disc-num" style="background:var(--dev-dim);color:var(--dev);border:1px solid rgba(52,211,153,0.2);">3</div>
+          <div class="disc-title">Part A complete and verified before Part B</div>
+        </div>
+        <div class="disc-body">
+          <div class="disc-why">Remediation is not a background task. Every blocker resolved in Part A is a foundation stone for Part B. Do not start Part B while Part A is incomplete — even partially.</div>
+          <div class="compare">
+            <div class="cmp-row cmp-bad"><div class="cmp-label">✗</div><div class="cmp-body">"AuthGuard is 80% done, I'll finish it alongside Admin" → <span class="bad">Admin is built against incomplete auth</span></div></div>
+            <div class="cmp-row cmp-good"><div class="cmp-label">✓</div><div class="cmp-body">AuthGuard built → tested → committed → <span class="hi">lint passes → then start Admin</span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="disc-card">
+        <div class="disc-card-hdr">
+          <div class="disc-num" style="background:var(--dev-dim);color:var(--dev);border:1px solid rgba(52,211,153,0.2);">4</div>
+          <div class="disc-title">Scope agent tasks to one module boundary</div>
+        </div>
+        <div class="disc-body">
+          <div class="disc-why">The agent must stay within the Admin module boundary. If it starts modifying Dashboard or Payment components, stop it. Cross-module changes without an LLM design decision are always wrong.</div>
+          <div class="compare">
+            <div class="cmp-row cmp-bad"><div class="cmp-label">✗</div><div class="cmp-body">Agent "helpfully" refactors Dashboard while building Admin → <span class="bad">untested changes in a working module</span></div></div>
+            <div class="cmp-row cmp-good"><div class="cmp-label">✓</div><div class="cmp-body">Prompt includes: <span class="hi">"Only create files under src/components/Admin/. Do not modify any existing files."</span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="disc-card">
+        <div class="disc-card-hdr">
+          <div class="disc-num" style="background:var(--dev-dim);color:var(--dev);border:1px solid rgba(52,211,153,0.2);">5</div>
+          <div class="disc-title">Lint after every agent session</div>
+        </div>
+        <div class="disc-body">
+          <div class="disc-why">Run lint immediately after each agent session — not at the end of the module build. Agents introduce lint errors silently. Catching them per session means you know exactly which session caused it.</div>
+          <div class="compare">
+            <div class="cmp-row cmp-bad"><div class="cmp-label">✗</div><div class="cmp-body">5 agent sessions → run lint once at end → 23 errors → <span class="bad">don't know which session caused what</span></div></div>
+            <div class="cmp-row cmp-good"><div class="cmp-label">✓</div><div class="cmp-body">Session 1 → <code style="color:var(--dev)">npm run lint</code> → 0 errors → commit → Session 2 → lint → repeat</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="disc-card">
+        <div class="disc-card-hdr">
+          <div class="disc-num" style="background:var(--dev-dim);color:var(--dev);border:1px solid rgba(52,211,153,0.2);">6</div>
+          <div class="disc-title">When agent and LLM disagree — LLM wins</div>
+        </div>
+        <div class="disc-body">
+          <div class="disc-why">The LLM designed the module with the full picture — blueprint, gap report, your decisions. If the agent suggests a different approach mid-execution, that is the agent working from local context only. Escalate to LLM for any structural decision.</div>
+          <div class="compare">
+            <div class="cmp-row cmp-bad"><div class="cmp-label">✗</div><div class="cmp-body">Agent says "I'll put admin types in the component folder" → <span class="bad">accept without checking LLM design</span></div></div>
+            <div class="cmp-row cmp-good"><div class="cmp-label">✓</div><div class="cmp-body">Ask LLM: <span class="hi">"Agent suggested X — does this conflict with the final design?"</span> LLM arbitrates.</div></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- During checklist -->
+    <div class="checklist-section">
+      <div class="checklist-title"><span>★</span> Per-Session Checklist — Run Each Agent Session</div>
+      <div class="checklist-card">
+        <div class="cl-hdr dev-hdr">
+          Each agent session during module build
+          <span class="cl-progress" id="cp-during">0 / 7</span>
+        </div>
+        <div class="cl-item" onclick="tick(this,'during')"><div class="cl-box"></div><span>Scoped prompt includes: exact files to create, module boundary, "do not modify existing files" <span class="tag tag-agent">Agent</span></span></div>
+        <div class="cl-item" onclick="tick(this,'during')"><div class="cl-box"></div><span>Part A remediation is fully complete and committed before any Part B work <span class="tag tag-blocker">must</span></span></div>
+        <div class="cl-item" onclick="tick(this,'during')"><div class="cl-box"></div><span>Run <code style="color:var(--dev)">npm run lint</code> after session — 0 errors before next session</span></div>
+        <div class="cl-item" onclick="tick(this,'during')"><div class="cl-box"></div><span>Read every file the agent created — no unreviewed output <span class="tag tag-warn">risk</span></span></div>
+        <div class="cl-item" onclick="tick(this,'during')"><div class="cl-box"></div><span>Committed after each verified session — clean bisect history</span></div>
+        <div class="cl-item" onclick="tick(this,'during')"><div class="cl-box"></div><span>Agent stayed within module boundary — no cross-module modifications</span></div>
+        <div class="cl-item" onclick="tick(this,'during')"><div class="cl-box"></div><span>Any structural agent suggestion checked against LLM final design before accepting <span class="tag tag-llm">LLM</span></span></div>
+      </div>
+    </div>
+
+    <!-- Ownership table -->
+    <div style="font-size:10px;letter-spacing:3px;color:var(--muted);text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:10px;">
+      <span style="color:var(--dev)">★</span> During Development — Who Does What
+      <span style="flex:1;height:1px;background:var(--border);display:block;"></span>
+    </div>
+    <div class="ownership-table">
+      <div class="ot-hdr">
+        <div class="ot-hdr-cell">Situation</div>
+        <div class="ot-hdr-cell" style="text-align:center;">LLM</div>
+        <div class="ot-hdr-cell" style="text-align:center;">Agent</div>
+        <div class="ot-hdr-cell" style="text-align:center;">Developer</div>
+      </div>
+      <div class="ot-row">
+        <div class="ot-situation">New file needs to be created<small>Clear location from execution package</small></div>
+        <div class="ot-cell"><span class="owner-badge ob-none">–</span></div>
+        <div class="ot-cell"><span class="owner-badge ob-agent">Executes</span></div>
+        <div class="ot-cell"><span class="owner-badge ob-dev">Reviews</span></div>
+      </div>
+      <div class="ot-row">
+        <div class="ot-situation">Unclear how a component should work<small>Logic or pattern decision needed</small></div>
+        <div class="ot-cell"><span class="owner-badge ob-llm">Decides</span></div>
+        <div class="ot-cell"><span class="owner-badge ob-none">–</span></div>
+        <div class="ot-cell"><span class="owner-badge ob-dev">Asks LLM</span></div>
+      </div>
+      <div class="ot-row">
+        <div class="ot-situation">Agent suggests changing an existing file<small>Outside the new module</small></div>
+        <div class="ot-cell"><span class="owner-badge ob-llm">Arbitrates</span></div>
+        <div class="ot-cell"><span class="owner-badge ob-stop">Stop</span></div>
+        <div class="ot-cell"><span class="owner-badge ob-dev">Escalates</span></div>
+      </div>
+      <div class="ot-row">
+        <div class="ot-situation">Bug found during module build<small>Something in the new module doesn't work</small></div>
+        <div class="ot-cell"><span class="owner-badge ob-none">–</span></div>
+        <div class="ot-cell"><span class="owner-badge ob-agent">Fixes</span></div>
+        <div class="ot-cell"><span class="owner-badge ob-dev">Diagnoses first</span></div>
+      </div>
+      <div class="ot-row">
+        <div class="ot-situation">Bug found in existing module during build<small>Something outside new module breaks</small></div>
+        <div class="ot-cell"><span class="owner-badge ob-llm">Analyses</span></div>
+        <div class="ot-cell"><span class="owner-badge ob-stop">Pause</span></div>
+        <div class="ot-cell"><span class="owner-badge ob-dev">Decides scope</span></div>
+      </div>
+      <div class="ot-row">
+        <div class="ot-situation">Lint errors after agent session<small>ESLint or TypeScript flags issues</small></div>
+        <div class="ot-cell"><span class="owner-badge ob-none">–</span></div>
+        <div class="ot-cell"><span class="owner-badge ob-agent">Fixes</span></div>
+        <div class="ot-cell"><span class="owner-badge ob-dev">Verifies fix</span></div>
+      </div>
+      <div class="ot-row">
+        <div class="ot-situation">Gap decision needs revisiting<small>Accepted risk is now causing problems</small></div>
+        <div class="ot-cell"><span class="owner-badge ob-llm">Redesigns</span></div>
+        <div class="ot-cell"><span class="owner-badge ob-none">–</span></div>
+        <div class="ot-cell"><span class="owner-badge ob-dev">Decides</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════ ANTI-PATTERNS ═══════════ -->
+  <div class="sec" id="sec-antipatterns">
+    <div class="sec-title" style="color:var(--danger)">Anti-Patterns</div>
+    <p class="sec-sub">These are the specific mistakes developers make when adding modules to existing projects with AI assistance. Each one compounds the existing drift rather than resolving it.</p>
+
+    <div class="antipattern-list">
+
+      <div class="ap-card">
+        <div class="ap-hdr">
+          <span class="ap-icon">💀</span>
+          <span class="ap-name">Building on Unresolved Blockers</span>
+        </div>
+        <div class="ap-body">
+          <div class="ap-what">
+            <strong>What happens</strong>
+            Developer skips Part A, asks agent to build Admin Dashboard directly. AuthGuard doesn't exist. Agent implements its own ad-hoc route check inline in AdminLayout.tsx.
+          </div>
+          <div class="ap-what">
+            <strong>Why it's fatal</strong>
+            Now route protection logic exists in two places — AdminLayout and wherever AuthGuard eventually gets built. They will diverge. Admin ships with weaker auth than the rest of the app.
+            <span class="fix">✓ Fix: Part A fully resolved and committed before Part B starts. No exceptions.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="ap-card">
+        <div class="ap-hdr">
+          <span class="ap-icon">🔁</span>
+          <span class="ap-name">Duplicating Logic Instead of Extracting</span>
+        </div>
+        <div class="ap-body">
+          <div class="ap-what">
+            <strong>What happens</strong>
+            Admin needs subscription status. Agent copies the inline subscription check from Checkout.tsx into AdminSubscriptionPanel.tsx. Two copies, same logic.
+          </div>
+          <div class="ap-what">
+            <strong>Why it's fatal</strong>
+            Next time subscription logic changes — a new plan type, a Razorpay webhook update — the developer must remember to update both places. They won't. Silent inconsistency ships.
+            <span class="fix">✓ Fix: Extract to useSubscription.ts in Part A. Admin and Checkout both import from one source.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="ap-card">
+        <div class="ap-hdr">
+          <span class="ap-icon">🌊</span>
+          <span class="ap-name">Letting the Agent Drift the Blueprint Further</span>
+        </div>
+        <div class="ap-body">
+          <div class="ap-what">
+            <strong>What happens</strong>
+            Agent creates Admin files in src/admin/ instead of src/components/Admin/. Developer doesn't notice. Now there are three naming conventions in the codebase.
+          </div>
+          <div class="ap-what">
+            <strong>Why it's fatal</strong>
+            Every future module has more conventions to choose from. RAG context for future agents gets noisier. New developers have no clear pattern to follow.
+            <span class="fix">✓ Fix: Execution package specifies exact paths. Agent prompt says "use only these paths, no variations."</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="ap-card">
+        <div class="ap-hdr">
+          <span class="ap-icon">🎲</span>
+          <span class="ap-name">Accepting Silent Gap Decisions from the LLM</span>
+        </div>
+        <div class="ap-body">
+          <div class="ap-what">
+            <strong>What happens</strong>
+            LLM notices the types/ folder is missing and silently designs Admin types inline in each component instead of flagging it as a gap. Developer doesn't realise a decision was made for them.
+          </div>
+          <div class="ap-what">
+            <strong>Why it's fatal</strong>
+            Inline types can't be shared. Next module needs User type — it either duplicates it or has no types. The types/ folder gap has now propagated across two modules.
+            <span class="fix">✓ Fix: Every gap must surface in Step 2 and get an explicit developer decision in Step 3.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="ap-card">
+        <div class="ap-hdr">
+          <span class="ap-icon">🏃</span>
+          <span class="ap-name">Stacking Multiple Module Additions Without Gaps Review</span>
+        </div>
+        <div class="ap-body">
+          <div class="ap-what">
+            <strong>What happens</strong>
+            After Admin Dashboard, developer immediately asks agent to also add Analytics Module and Notification Module in the same session.
+          </div>
+          <div class="ap-what">
+            <strong>Why it's fatal</strong>
+            Each new module should run the LLM→Agent→LLM flow independently. Stacking them means gaps in Admin affect Analytics which affects Notifications. By the end nothing is cleanly isolated.
+            <span class="fix">✓ Fix: One module at a time. Complete flow, commit, verify. Then start the next module's flow.</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════ QUICK REFERENCE ═══════════ -->
+  <div class="sec" id="sec-quickref">
+    <div class="sec-title" style="color:var(--llm)">Quick Reference</div>
+    <p class="sec-sub">At a glance — what to use and when during module addition development.</p>
+
+    <div class="quick-ref" style="margin-bottom:28px;">
+      <div class="qr-hdr">Situation → Mode</div>
+      <div class="qr-grid">
+        <div class="qr-cell">
+          <div class="qr-sit">Need to add a new module</div>
+          <div class="qr-act">Start with LLM theoretical design against blueprint — never agent first</div>
+          <span class="qr-mode m-llm">LLM First</span>
+        </div>
+        <div class="qr-cell">
+          <div class="qr-sit">LLM has theoretical design</div>
+          <div class="qr-act">Agent audits actual codebase against the theoretical design</div>
+          <span class="qr-mode m-agent">Agent</span>
+        </div>
+        <div class="qr-cell">
+          <div class="qr-sit">Agent gap report ready</div>
+          <div class="qr-act">Developer reviews — you decide fix or accept, not the LLM</div>
+          <span class="qr-mode m-dev">Developer</span>
+        </div>
+        <div class="qr-cell">
+          <div class="qr-sit">Gap decisions made</div>
+          <div class="qr-act">LLM redesigns with theory + reality + your decisions combined</div>
+          <span class="qr-mode m-llm">LLM Final</span>
+        </div>
+        <div class="qr-cell">
+          <div class="qr-sit">Final design ready</div>
+          <div class="qr-act">Execute Part A (remediation) fully before starting Part B</div>
+          <span class="qr-mode m-agent">Agent A→B</span>
+        </div>
+        <div class="qr-cell">
+          <div class="qr-sit">Agent suggests modifying existing file</div>
+          <div class="qr-act">Stop. Escalate to LLM. Agent has no design context for that file.</div>
+          <span class="qr-mode m-stop">Stop Agent</span>
+        </div>
+        <div class="qr-cell">
+          <div class="qr-sit">Unclear how new component should work</div>
+          <div class="qr-act">Ask LLM — not agent. LLM has full picture of design intent.</div>
+          <span class="qr-mode m-llm">LLM</span>
+        </div>
+        <div class="qr-cell">
+          <div class="qr-sit">Bug in new module during build</div>
+          <div class="qr-act">Diagnose first (Part 1 discipline guide). Then agent with exact file + error.</div>
+          <span class="qr-mode m-agent">Agent</span>
+        </div>
+        <div class="qr-cell">
+          <div class="qr-sit">Bug found in existing module during build</div>
+          <div class="qr-act">Pause new module. Decide scope. Don't let agent fix both simultaneously.</div>
+          <span class="qr-mode m-dev">Developer</span>
+        </div>
+        <div class="qr-cell">
+          <div class="qr-sit">Accepted risk is now causing problems</div>
+          <div class="qr-act">Re-run LLM with updated gap decision. Redesign before agent touches anything.</div>
+          <span class="qr-mode m-llm">LLM</span>
+        </div>
+        <div class="qr-cell">
+          <div class="qr-sit">3+ cycles on same bug</div>
+          <div class="qr-act">Stop agent. Switch to LLM to re-diagnose root cause before more cycles.</div>
+          <span class="qr-mode m-llm">LLM</span>
+        </div>
+        <div class="qr-cell">
+          <div class="qr-sit">Module complete</div>
+          <div class="qr-act">Lint passes, committed, reviewed. Only then start next module flow.</div>
+          <span class="qr-mode m-dev">Developer</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- The core difference summary -->
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:24px;">
+      <div style="font-size:10px;letter-spacing:3px;color:var(--muted);text-transform:uppercase;margin-bottom:16px;">The Core Difference from Part 1</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--info);margin-bottom:10px;letter-spacing:1px;">PART 1 — NEW PROJECT</div>
+          <div style="font-size:11px;color:var(--muted2);line-height:1.8;">
+            → LLM designs from blank slate<br>
+            → Agent executes clean blueprint<br>
+            → Risk: premature execution<br>
+            → Main discipline: design first, always<br>
+            → Codebase = intended state
+          </div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--dev);margin-bottom:10px;letter-spacing:1px;">PART 2 — EXISTING PROJECT</div>
+          <div style="font-size:11px;color:var(--muted2);line-height:1.8;">
+            → LLM designs against theory first<br>
+            → Agent audits reality vs theory<br>
+            → Risk: building on broken foundation<br>
+            → Main discipline: reconcile before build<br>
+            → Codebase = reality (not intended state)
+          </div>
+        </div>
+      </div>
+    </div>
+  </div><!-- end sec-quickref -->
+
+  <!-- ═══════════ CONSEQUENCES ═══════════ -->
+  <div class="sec" id="sec-consequences">
+    <div class="sec-title" style="color:var(--agent)">Consequences</div>
+    <p class="sec-sub">Same scenario. Same gap report. Same developer decisions. The only difference: Step 4 uses the LLM on the left and an Agent on the right. Watch what each produces — then the LLM analyses its own output versus the agent's to explain exactly where the agent went wrong and why.</p>
+
+    <!-- Scenario context -->
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:18px;margin-bottom:24px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;">
+      <div>
+        <div style="font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:8px;">Scenario</div>
+        <div style="font-size:11px;color:var(--text);line-height:1.6;">Add Admin Dashboard to React e-commerce app with user management, subscription overview, payment history</div>
+      </div>
+      <div>
+        <div style="font-size:9px;letter-spacing:2px;color:var(--danger);text-transform:uppercase;margin-bottom:8px;">Known Blockers</div>
+        <div style="font-size:11px;color:var(--muted2);line-height:1.7;">AuthGuard missing<br>useSubscription missing<br>usePayment missing<br>types/ folder missing</div>
+      </div>
+      <div>
+        <div style="font-size:9px;letter-spacing:2px;color:var(--warn);text-transform:uppercase;margin-bottom:8px;">Developer Decisions</div>
+        <div style="font-size:11px;color:var(--muted2);line-height:1.7;">Fix AuthGuard ✓<br>Fix types/ ✓<br>Fix hooks ✓<br>Accept .js services<br>Accept no barrels</div>
+      </div>
+    </div>
+
+    <button class="run-compare-btn" id="btn-compare" onclick="runComparison()">
+      <span class="loader" style="width:12px;height:12px;border-color:rgba(255,255,255,0.2);border-top-color:#fff;display:none;" id="compare-loader"></span>
+      <span id="compare-btn-text">▶ Run Parallel Comparison — LLM vs Agent</span>
+    </button>
+
+    <!-- Step 4 comparison -->
+    <div style="margin-top:28px;display:none;" id="step4-section">
+      <div style="font-size:10px;letter-spacing:3px;color:var(--muted);text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:10px;">
+        <span>Step 4 — Final Design</span><span style="flex:1;height:1px;background:var(--border);display:block;"></span>
+        <span style="color:var(--llm);">LLM</span><span style="color:var(--muted)"> vs </span><span style="color:var(--agent)">Agent</span>
+      </div>
+      <div class="compare-grid">
+        <div class="cg-col llm-col">
+          <div class="cg-hdr">
+            <span>◆ LLM Final Design</span>
+            <span class="step-badge">Has blueprint context</span>
+          </div>
+          <div class="cg-body" id="llm-design-out">
+            <div class="cg-loading"><span class="loader" style="color:var(--llm)"></span><span>LLM reasoning...</span></div>
+          </div>
+        </div>
+        <div class="cg-col agent-col">
+          <div class="cg-hdr">
+            <span>◆ Agent Final Design</span>
+            <span class="step-badge">Codebase only</span>
+          </div>
+          <div class="cg-body" id="agent-design-out">
+            <div class="cg-loading"><span class="loader" style="color:var(--agent)"></span><span>Agent scanning codebase...</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 5 comparison -->
+    <div style="display:none;" id="step5-section">
+      <div style="font-size:10px;letter-spacing:3px;color:var(--muted);text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:10px;">
+        <span>Step 5 — Execution Package</span><span style="flex:1;height:1px;background:var(--border);display:block;"></span>
+        <span style="color:var(--llm);">LLM</span><span style="color:var(--muted)"> vs </span><span style="color:var(--agent)">Agent</span>
+      </div>
+      <div class="compare-grid">
+        <div class="cg-col llm-col">
+          <div class="cg-hdr"><span>◆ LLM Execution Package</span><span class="step-badge">Part A → Part B</span></div>
+          <div class="cg-body" id="llm-pkg-out"></div>
+        </div>
+        <div class="cg-col agent-col">
+          <div class="cg-hdr"><span>◆ Agent Execution Package</span><span class="step-badge">No remediation</span></div>
+          <div class="cg-body" id="agent-pkg-out"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Comparison table -->
+    <div style="display:none;" id="comparison-section">
+      <div style="font-size:10px;letter-spacing:3px;color:var(--muted);text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:10px;">
+        <span>LLM Analysis — What Went Wrong and Why</span><span style="flex:1;height:1px;background:var(--border);display:block;"></span>
+      </div>
+      <div class="comp-table">
+        <div class="ct-hdr">
+          <div class="ct-hdr-cell">Metric</div>
+          <div class="ct-hdr-cell llm-h">LLM Design</div>
+          <div class="ct-hdr-cell agent-h">Agent Design</div>
+        </div>
+        <div id="comp-table-rows"></div>
+      </div>
+      <div class="verdict-card">
+        <div class="verdict-title">LLM Verdict</div>
+        <div class="verdict-body" id="verdict-body">
+          <div class="cg-loading"><span class="loader" style="color:var(--llm)"></span><span>LLM analysing both outputs...</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ AGENT AT STEP 4 ═══════════ -->
+  <div class="sec" id="sec-pipeline-agent">
+    <div class="sec-title" style="color:var(--agent)">What Happens When Step 4 Is Agent</div>
+    <p class="sec-sub">The same 5-step pipeline — but Step 4 is handed to the Agent instead of the LLM. Each step runs in sequence so you can see exactly where the design degrades and why.</p>
+
+    <!-- Pipeline diagram -->
+    <div style="display:flex;align-items:center;gap:0;margin-bottom:28px;overflow-x:auto;padding-bottom:4px;">
+      <div class="pa-step" style="border-color:rgba(167,139,250,0.3)">
+        <div class="pa-num" style="background:rgba(167,139,250,0.12);color:var(--llm);border-color:rgba(167,139,250,0.3);">1</div>
+        <div class="pa-label" style="color:var(--llm)">LLM</div>
+        <div class="pa-desc">Theoretical design from blueprint</div>
+      </div>
+      <div class="pa-arrow">›</div>
+      <div class="pa-step" style="border-color:rgba(251,146,60,0.3)">
+        <div class="pa-num" style="background:rgba(251,146,60,0.12);color:var(--agent);border-color:rgba(251,146,60,0.3);">2</div>
+        <div class="pa-label" style="color:var(--agent)">Agent</div>
+        <div class="pa-desc">Gap audit — reality vs theory</div>
+      </div>
+      <div class="pa-arrow">›</div>
+      <div class="pa-step" style="border-color:rgba(52,211,153,0.3)">
+        <div class="pa-num" style="background:rgba(52,211,153,0.12);color:var(--dev);border-color:rgba(52,211,153,0.3);">3</div>
+        <div class="pa-label" style="color:var(--dev)">Dev</div>
+        <div class="pa-desc">Fix / accept decisions</div>
+      </div>
+      <div class="pa-arrow">›</div>
+      <div class="pa-step" style="border-color:rgba(251,146,60,0.6);box-shadow:0 0 14px rgba(251,146,60,0.15);">
+        <div class="pa-num" style="background:rgba(251,146,60,0.2);color:var(--agent);border-color:var(--agent);">4</div>
+        <div class="pa-label" style="color:var(--agent)">Agent <span style="font-size:8px;background:var(--danger-dim);color:var(--danger);padding:1px 5px;border-radius:4px;margin-left:4px;">CHANGED</span></div>
+        <div class="pa-desc" style="color:var(--danger)">Final design from codebase only</div>
+      </div>
+      <div class="pa-arrow">›</div>
+      <div class="pa-step" style="border-color:rgba(251,146,60,0.3)">
+        <div class="pa-num" style="background:rgba(251,146,60,0.12);color:var(--agent);border-color:rgba(251,146,60,0.3);">5</div>
+        <div class="pa-label" style="color:var(--agent)">Agent</div>
+        <div class="pa-desc">Executes from Step 4 output</div>
+      </div>
+    </div>
+
+    <button class="run-compare-btn" id="btn-pipeline" onclick="runPipeline()">
+      <span class="loader" style="width:12px;height:12px;border-color:rgba(255,255,255,0.2);border-top-color:#fff;display:none;" id="pipeline-loader"></span>
+      <span id="pipeline-btn-text">▶ Run Full Pipeline — Agent at Step 4</span>
+    </button>
+
+    <!-- Steps container -->
+    <div id="pa-steps" style="margin-top:28px;"></div>
+  </div>
+
+</div><!-- end .content -->
+
+<script>
+// ── AGENT AT STEP 4 PIPELINE ─────────────────────────────────────────────
+
+function paStep(num, who, color, title, bodyHtml, badge) {
+  const badgeHtml = badge ? `<span class="pa-badge" style="background:${color}22;color:${color};">${badge}</span>` : '';
+  return `<div class="pa-output">
+    <div class="pa-output-hdr" style="background:${color}11;color:${color};border-bottom-color:${color}22;">
+      <span style="width:22px;height:22px;border-radius:50%;background:${color}22;border:1px solid ${color}44;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;">${num}</span>
+      <span>${who} — ${title}</span>${badgeHtml}
+    </div>
+    <div class="pa-output-body">${bodyHtml}</div>
+  </div>`;
+}
+
+function paFileList(files, col) {
+  if (!files || !files.length) return '<span style="color:var(--muted)">None</span>';
+  return files.map(f => `<div style="display:flex;gap:8px;align-items:center;padding:4px 8px;background:var(--card2);border-radius:4px;margin-bottom:3px;">
+    <span style="color:var(--info);flex:1;">${f.file||f.path||f}</span>
+    <span style="font-size:9px;font-weight:700;color:${col};">${f.action||'FILE'}</span>
+  </div>`).join('');
+}
+
+async function runPipeline() {
+  const btn = document.getElementById('btn-pipeline');
+  const loader = document.getElementById('pipeline-loader');
+  const btnText = document.getElementById('pipeline-btn-text');
+  const container = document.getElementById('pa-steps');
+  btn.disabled = true; loader.style.display = 'inline-block';
+  container.innerHTML = '';
+
+  const setStatus = t => { btnText.textContent = t; };
+
+  // ── STEP 1: LLM theoretical design ────────────────────────────────────────
+  setStatus('Step 1 — LLM designing theoretically...');
+  let step1;
+  try {
+    const s1sys = `You are a senior architect with full knowledge of the original project blueprint.
+Blueprint: ${JSON.stringify(SCENARIO.blueprint)}
+Do NOT look at the real codebase yet. Design the Admin Dashboard theoretically against the original blueprint.
+Output ONLY valid JSON:
+{
+  "approach": "2 sentence description",
+  "modules": [{"name":"module","files":["file.tsx"],"purpose":"what it does"}],
+  "assumptions": ["what you assume exists per blueprint"]
+}`;
+    step1 = repairJSON(await callClaude(s1sys, 'Generate the theoretical design. Output ONLY JSON.'));
+  } catch(e) { step1 = { approach: 'LLM call failed: ' + e.message, modules: [], assumptions: [] }; }
+
+  const s1body = `
+    <div style="margin-bottom:10px;color:var(--muted2);">${step1.approach||''}</div>
+    <div style="font-size:9px;letter-spacing:2px;color:var(--llm);text-transform:uppercase;margin-bottom:6px;">Modules designed</div>
+    ${(step1.modules||[]).map(m => `<div style="padding:5px 10px;background:var(--card2);border-radius:4px;margin-bottom:3px;">
+      <span style="color:var(--llm);font-weight:700;">${m.name}</span>
+      <span style="color:var(--muted);font-size:10px;margin-left:8px;">${(m.files||[]).join(', ')}</span>
+    </div>`).join('')}
+    <div style="font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin:10px 0 6px;">Blueprint assumptions</div>
+    ${(step1.assumptions||[]).map(a => `<div style="font-size:10px;color:var(--muted2);padding:2px 0;">• ${a}</div>`).join('')}
+    <div class="pa-good">✓ LLM reasoned from blueprint intent. AuthGuard, hooks, and types/ all assumed present because the blueprint requires them.</div>`;
+  container.innerHTML += paStep(1, 'LLM', 'var(--llm)', 'Theoretical Design', s1body, 'Blueprint context');
+
+  // ── STEP 2: Agent gap audit ────────────────────────────────────────────────
+  setStatus('Step 2 — Agent auditing real codebase...');
+  let step2;
+  try {
+    const s2sys = `You are an AI coding agent. Audit the real codebase against the theoretical design.
+Real codebase: ${SCENARIO.driftedCodebase.exists.join(', ')}
+Theoretical design requires: ${JSON.stringify(step1.assumptions||[])}
+Output ONLY valid JSON:
+{
+  "gaps": [{"item":"what is missing","severity":"BLOCKER|WARNING|INFO","impact":"what breaks without it"}],
+  "drift": ["naming or structure differences found"]
+}`;
+    step2 = repairJSON(await callClaude(s2sys, 'Generate the gap report. Output ONLY JSON.'));
+  } catch(e) { step2 = { gaps: [], drift: [] }; }
+
+  const s2body = `
+    <div style="font-size:9px;letter-spacing:2px;color:var(--danger);text-transform:uppercase;margin-bottom:8px;">Gaps found</div>
+    ${(step2.gaps||[]).map(g => {
+      const col = g.severity==='BLOCKER' ? 'var(--danger)' : g.severity==='WARNING' ? 'var(--warn)' : 'var(--muted2)';
+      return `<div style="display:flex;gap:10px;padding:6px 10px;background:var(--card2);border-radius:4px;margin-bottom:4px;align-items:flex-start;">
+        <span style="font-size:9px;font-weight:700;color:${col};min-width:56px;padding-top:1px;">${g.severity}</span>
+        <span style="flex:1;color:var(--text);">${g.item}</span>
+        <span style="font-size:10px;color:var(--muted);">${g.impact||''}</span>
+      </div>`;
+    }).join('')}
+    <div style="font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin:10px 0 6px;">Drift detected</div>
+    ${(step2.drift||[]).map(d => `<div style="font-size:10px;color:var(--warn);padding:2px 0;">~ ${d}</div>`).join('')}`;
+  container.innerHTML += paStep(2, 'Agent', 'var(--agent)', 'Gap Audit', s2body, 'Codebase scan');
+
+  // ── STEP 3: Developer decisions (static — same fixed scenario) ─────────────
+  const s3body = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+      <div>
+        <div style="font-size:9px;letter-spacing:2px;color:var(--dev);text-transform:uppercase;margin-bottom:8px;">Fix (resolve before build)</div>
+        ${SCENARIO.devDecisions.fix.map(d => `<div style="padding:5px 10px;background:var(--dev-dim);border-radius:4px;margin-bottom:3px;font-size:11px;color:var(--dev);">✓ ${d}</div>`).join('')}
+      </div>
+      <div>
+        <div style="font-size:9px;letter-spacing:2px;color:var(--warn);text-transform:uppercase;margin-bottom:8px;">Accept (carry forward as risk)</div>
+        ${SCENARIO.devDecisions.accept.map(d => `<div style="padding:5px 10px;background:var(--warn-dim);border-radius:4px;margin-bottom:3px;font-size:11px;color:var(--warn);">~ ${d}</div>`).join('')}
+      </div>
+    </div>
+    <div class="pa-good" style="margin-top:12px;">✓ Developer has made explicit fix/accept decisions. These would now be handed to the LLM for a final design. <strong style="color:var(--danger)">But in this pipeline — they go to the Agent instead.</strong></div>`;
+  container.innerHTML += paStep(3, 'Developer', 'var(--dev)', 'Gap Decisions', s3body, 'Fix / Accept');
+
+  // ── STEP 4: AGENT final design (the changed step) ─────────────────────────
+  setStatus('Step 4 — Agent producing final design (codebase only)...');
+  let step4;
+  try {
+    const s4sys = `You are an AI coding agent. You do NOT have the original blueprint. You only see the codebase.
+Actual files: ${SCENARIO.driftedCodebase.exists.join(', ')}
+Missing files noticed: ${SCENARIO.driftedCodebase.missing.join(', ')}
+Developer said fix: ${SCENARIO.devDecisions.fix.join(', ')} | accept: ${SCENARIO.devDecisions.accept.join(', ')}
+Task: ${SCENARIO.request}
+
+You build from what exists. You follow existing patterns.
+Output ONLY valid JSON:
+{
+  "approach": "2 sentence description of how you approach this",
+  "remediationFirst": [{"file":"path","action":"CREATE","reason":"why"}],
+  "adminFiles": [{"file":"path","purpose":"what it does","uses":"what it copies or imports from"}],
+  "keyDecisions": [{"decision":"what","why":"pattern-based reasoning","risk":"what this misses from original intent"}]
+}`;
+    step4 = repairJSON(await callClaude(s4sys, 'Generate the final design from the codebase. Output ONLY JSON.'));
+  } catch(e) { step4 = { approach: 'Agent call failed: ' + e.message, remediationFirst: [], adminFiles: [], keyDecisions: [] }; }
+
+  const s4body = `
+    <div style="padding:8px 12px;background:var(--danger-dim);border:1px solid rgba(248,113,113,0.2);border-radius:6px;margin-bottom:14px;font-size:11px;color:var(--danger);">
+      ⚠ Step 4 is now the Agent — no blueprint context, no original intent. It can only pattern-match against the drifted codebase.
+    </div>
+    <div style="margin-bottom:12px;color:var(--muted2);">${step4.approach||''}</div>
+    <div style="font-size:9px;letter-spacing:2px;color:var(--warn);text-transform:uppercase;margin-bottom:6px;">Remediation it planned</div>
+    ${(step4.remediationFirst||[]).length
+      ? (step4.remediationFirst||[]).map(f => `<div style="display:flex;gap:8px;padding:5px 8px;background:var(--card2);border-radius:4px;margin-bottom:3px;font-size:10px;">
+          <span style="color:var(--info);flex:1;">${f.file}</span><span style="color:var(--warn);font-size:9px;">${f.action||'FIX'}</span>
+        </div>`).join('')
+      : '<div class="pa-warning">✗ Agent skipped remediation or planned minimal fixes — it cannot reason about WHY blockers matter without blueprint context.</div>'
+    }
+    <div style="font-size:9px;letter-spacing:2px;color:var(--agent);text-transform:uppercase;margin:12px 0 6px;">Admin files it will create</div>
+    ${(step4.adminFiles||[]).map(f => {
+      const risky = f.uses && (f.uses.toLowerCase().includes('inline')||f.uses.toLowerCase().includes('copy')||f.uses.toLowerCase().includes('checkout'));
+      return `<div style="padding:5px 8px;background:var(--card2);border-radius:4px;margin-bottom:3px;">
+        <div style="display:flex;gap:8px;font-size:10px;">
+          <span style="color:var(--info);flex:1;">${f.file}</span><span style="color:var(--agent);font-size:9px;">CREATE</span>
+        </div>
+        ${f.uses ? `<div style="font-size:10px;padding-top:2px;${risky?'color:var(--danger)':'color:var(--muted)'};">uses: ${f.uses}</div>` : ''}
+      </div>`;
+    }).join('')}
+    <div style="font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin:12px 0 6px;">Key decisions &amp; hidden risks</div>
+    ${(step4.keyDecisions||[]).map(d => `<div style="padding:8px 10px;background:var(--card2);border-left:2px solid var(--danger);border-radius:4px;margin-bottom:6px;">
+      <div style="font-size:11px;color:var(--agent);font-weight:700;margin-bottom:2px;">${d.decision}</div>
+      <div style="font-size:10px;color:var(--muted2);">${d.why}</div>
+      ${d.risk ? `<div style="font-size:10px;color:var(--danger);margin-top:3px;">⚠ ${d.risk}</div>` : ''}
+    </div>`).join('')}`;
+  container.innerHTML += paStep(4, 'Agent', 'var(--agent)', 'Final Design — Codebase Only', s4body, 'CHANGED STEP');
+
+  // ── STEP 5: Execution package derived from agent's step 4 ─────────────────
+  const rem5 = step4.remediationFirst||[];
+  const adm5 = step4.adminFiles||[];
+  const s5body = `
+    <div style="font-size:10px;color:var(--muted2);margin-bottom:12px;">
+      Executing from Agent Step 4 output: <span style="color:var(--agent);">${rem5.length} remediation task${rem5.length!==1?'s':''} + ${adm5.length} admin file${adm5.length!==1?'s':''}</span>
+    </div>
+    ${rem5.length === 0
+      ? '<div class="pa-warning">✗ No remediation phase — Agent goes straight to Part B. AuthGuard, useSubscription, usePayment, types/ all unresolved. Admin will be built on a broken foundation.</div>'
+      : `<div style="font-size:9px;letter-spacing:2px;color:var(--warn);text-transform:uppercase;margin-bottom:6px;">Part A — Remediation</div>
+         ${rem5.map((f,i) => `<div style="display:flex;gap:8px;padding:5px 8px;background:var(--card2);border-radius:4px;margin-bottom:3px;font-size:10px;">
+           <span style="color:var(--muted);min-width:20px;">${String(i+1).padStart(2,'0')}.</span>
+           <span style="color:var(--warn);flex:1;">${f.file}</span><span style="color:var(--warn);font-size:9px;">FIX</span>
+         </div>`).join('')}`
+    }
+    <div style="font-size:9px;letter-spacing:2px;color:var(--agent);text-transform:uppercase;margin:10px 0 6px;">Part B — Admin Build</div>
+    ${adm5.map((f,i) => `<div style="display:flex;gap:8px;padding:5px 8px;background:var(--card2);border-radius:4px;margin-bottom:3px;font-size:10px;">
+      <span style="color:var(--muted);min-width:20px;">${String(i+1).padStart(2,'0')}.</span>
+      <span style="color:var(--info);flex:1;">${f.file||f.path||'?'}</span><span style="color:var(--agent);font-size:9px;">CREATE</span>
+    </div>`).join('')}
+    <div class="pa-warning" style="margin-top:14px;">
+      <strong style="display:block;margin-bottom:6px;">What breaks in production:</strong>
+      • Admin routes have no proper AuthGuard — any user can access admin pages<br>
+      • Payment logic is duplicated inline instead of shared via usePayment/useSubscription hooks — bugs fixed in one place won't propagate<br>
+      • No shared types/ — Admin and Subscription use incompatible type assumptions silently<br>
+      • Agent followed existing drift patterns (lowercase auth/, .js utils) — new module inherits all existing inconsistencies
+    </div>`;
+  container.innerHTML += paStep(5, 'Agent', 'var(--agent)', 'Execution Package', s5body, 'Executes Step 4');
+
+  btn.disabled = false; loader.style.display = 'none'; btnText.textContent = '↺ Run Again';
+}
+
+// ── EXISTING FUNCTIONS ────────────────────────────────────────────────────
+
+const SCENARIO = {
+  blueprint: {
+    modules: ['Auth','Dashboard','Payment/Subscription','Data Layer','API Client'],
+    conventions: 'PascalCase folders, TypeScript throughout, barrel index.ts files, hooks extracted',
+    decisions: ['Supabase RLS over custom middleware','TypeScript for type safety on payment data']
+  },
+  driftedCodebase: {
+    exists: ['src/components/auth/login.tsx','src/components/auth/register.tsx','src/components/payments/Plans.tsx','src/components/payments/Checkout.tsx','src/components/Dashboard/DashboardLayout.tsx','src/components/Dashboard/UserProfile.tsx','src/components/Dashboard/Stats.tsx','src/hooks/useAuth.ts','src/utils/supabase.js','src/utils/razorpay.js'],
+    missing: ['AuthGuard.tsx','useSubscription.ts','usePayment.ts','types/ folder'],
+    drift: ['Auth/ → auth/ (lowercase)','Subscription/ → payments/ (renamed)','services/ → utils/ (.js not .ts)']
+  },
+  devDecisions: { fix: ['AuthGuard','types/ folder','useSubscription','usePayment'], accept: ['.js services','no barrel files'] },
+  request: 'Admin Dashboard with user management, subscription overview, and payment history with refund capability'
+};
+
+// Auto-detects: relative path works on Vercel, falls back to localhost for dev
+const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:3000/api/claude'
+  : '/api/claude';
+
+async function callClaude(system, user) {
+  const r = await fetch(API, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:3000, system, messages:[{role:'user',content:user}] })
+  });
+  if (!r.ok) throw new Error(`API ${r.status}`);
+  const d = await r.json();
+  return d.content.map(b=>b.text||'').join('');
+}
+
+function repairJSON(raw) {
+  let text = raw.replace(/^```json\s*/i,'').replace(/^```\s*/i,'').replace(/```\s*$/,'').trim();
+  try{return JSON.parse(text);}catch(e){}
+  const inStr=s=>{let i=false,e=false;for(const c of s){if(e){e=false;continue;}if(c==='\\'){e=true;continue;}if(c==='"')i=!i;}return i;};
+  let safe=text;
+  for(let i=text.length-1;i>text.length*0.5;i--){const sl=text.slice(0,i);if(!inStr(sl)){safe=sl.replace(/[,\s]+$/,'');break;}}
+  let opens=[],i2=false,e2=false;
+  for(const c of safe){if(e2){e2=false;continue;}if(c==='\\'){e2=true;continue;}if(c==='"'){i2=!i2;continue;}if(i2)continue;if(c==='{')opens.push('}');if(c==='[')opens.push(']');if(c==='}'||c===']')opens.pop();}
+  try{return JSON.parse(safe+opens.reverse().join(''));}catch(e3){}
+  throw new Error('JSON parse failed');
+}
+
+async function runComparison() {
+  const btn = document.getElementById('btn-compare');
+  const loader = document.getElementById('compare-loader');
+  const btnText = document.getElementById('compare-btn-text');
+  btn.disabled = true;
+  loader.style.display = 'inline-block';
+  btnText.textContent = 'Running parallel calls...';
+
+  document.getElementById('step4-section').style.display = 'block';
+
+  // ── PARALLEL: LLM design + Agent design ──────────────────────────────────
+  const llmSystem = `You are a senior architect with full knowledge of the original project blueprint.
+Blueprint: ${JSON.stringify(SCENARIO.blueprint)}
+Drifted codebase: ${JSON.stringify(SCENARIO.driftedCodebase)}
+Developer gap decisions — FIX: ${SCENARIO.devDecisions.fix.join(', ')} | ACCEPT: ${SCENARIO.devDecisions.accept.join(', ')}
+Request: "${SCENARIO.request}"
+
+You know WHY the original design made every choice. Design the Admin Dashboard correctly — extract shared hooks before Admin uses them, create types/ folder before Admin types, build AuthGuard from design spec before Admin routes.
+
+Output ONLY valid JSON:
+{
+  "approach": "2 sentence description of your design approach referencing blueprint intent",
+  "remediationFirst": [
+    {"step":1,"file":"exact/path/file.tsx","action":"CREATE","reason":"why this must exist before Admin"}
+  ],
+  "adminFiles": [
+    {"file":"src/components/Admin/filename.tsx","purpose":"what it does","uses":"existing files it imports"}
+  ],
+  "keyDecisions": [
+    {"decision":"what you decided","why":"reason grounded in blueprint intent","avoids":"what problem this prevents"}
+  ]
+}`;
+
+  const agentSystem = `You are an AI coding agent. You have access to the actual codebase only — no design documents, no original blueprint.
+Actual codebase files: ${SCENARIO.driftedCodebase.exists.join(', ')}
+Missing files you noticed: ${SCENARIO.driftedCodebase.missing.join(', ')}
+Developer said to fix: ${SCENARIO.devDecisions.fix.join(', ')} and accept: ${SCENARIO.devDecisions.accept.join(', ')}
+Task: Build Admin Dashboard with user management, subscription overview, payment history.
+
+You work from what exists. You follow existing patterns in the codebase. You build what you can see.
+
+Output ONLY valid JSON:
+{
+  "approach": "2 sentence description of how you approach this from the codebase",
+  "remediationFirst": [
+    {"step":1,"file":"exact/path/file.tsx","action":"CREATE","reason":"why"}
+  ],
+  "adminFiles": [
+    {"file":"src/components/Admin/filename.tsx","purpose":"what it does","uses":"existing files or inline logic"}
+  ],
+  "keyDecisions": [
+    {"decision":"what you decided","why":"reason based on existing code patterns","avoids":"what you tried to avoid"}
+  ]
+}`;
+
+  let llmResult = null, agentResult = null;
+
+  try {
+    [llmResult, agentResult] = await Promise.all([
+      callClaude(llmSystem, 'Generate the Final Design. Output ONLY the JSON.').then(r => repairJSON(r)),
+      callClaude(agentSystem, 'Generate the Final Design from the codebase. Output ONLY the JSON.').then(r => repairJSON(r))
+    ]);
+  } catch(e) {
+    alert('Comparison failed: ' + e.message);
+    btn.disabled = false; loader.style.display = 'none'; btnText.textContent = '↺ Retry';
+    return;
+  }
+
+  renderDesign('llm-design-out', llmResult, 'llm');
+  renderDesign('agent-design-out', agentResult, 'agent');
+
+  // ── Step 5 packages ───────────────────────────────────────────────────────
+  document.getElementById('step5-section').style.display = 'block';
+  renderPackage('llm-pkg-out', llmResult, 'llm');
+  renderPackage('agent-pkg-out', agentResult, 'agent');
+
+  // ── Comparison table (static — derived from known outcomes) ───────────────
+  document.getElementById('comparison-section').style.display = 'block';
+  renderCompTable(llmResult, agentResult);
+
+  // ── Third call: LLM analyses both ─────────────────────────────────────────
+  btnText.textContent = 'LLM analysing both outputs...';
+  try {
+    const verdictSystem = `You are the same LLM that produced the correct Admin Dashboard design. You are now analysing your own output vs an agent's output to teach developers the consequences of using an agent in Step 4 instead of an LLM.
+
+Your correct design: ${JSON.stringify(llmResult)}
+Agent's design: ${JSON.stringify(agentResult)}
+
+Write a verdict that:
+1. Identifies specifically where the agent went wrong (exact decisions, exact files)
+2. Explains WHY the agent made those choices (it only sees codebase, not intent)
+3. States what would happen in production for each agent mistake
+4. Names the discipline that prevents each mistake
+
+Write in second person to the developer. Be specific. Reference actual file names. 3-4 paragraphs.
+Return plain text, no JSON, no markdown headers.`;
+
+    const verdictRaw = await callClaude(verdictSystem, 'Write the verdict now.');
+    document.getElementById('verdict-body').innerHTML = verdictRaw
+      .replace(/LLM/g, '<span class="hi-llm">LLM</span>')
+      .replace(/agent/gi, '<span class="hi-agent">agent</span>')
+      .replace(/production/gi, '<span class="hi-danger">production</span>')
+      .replace(/AuthGuard/g, '<span class="hi-danger">AuthGuard</span>')
+      .replace(/useSubscription|usePayment/g, m => `<span class="hi-danger">${m}</span>`)
+      .replace(/types\//g, '<span class="hi-danger">types/</span>')
+      .replace(/correct|correctly|right approach/gi, m => `<span class="hi-good">${m}</span>`)
+      .split('\n\n').map(p => p.trim() ? `<p style="margin-bottom:12px;">${p}</p>` : '').join('');
+  } catch(e) {
+    document.getElementById('verdict-body').textContent = 'Verdict generation failed: ' + e.message;
+  }
+
+  btn.disabled = false; loader.style.display = 'none'; btnText.textContent = '↺ Run Again';
+}
+
+function renderDesign(elId, data, mode) {
+  const el = document.getElementById(elId);
+  const col = mode === 'llm' ? 'var(--llm)' : 'var(--agent)';
+  if (!data) { el.innerHTML = `<div style="color:var(--danger);font-size:11px;">Failed to parse response</div>`; return; }
+
+  let html = '';
+  if (data.approach) {
+    html += `<div class="cg-reasoning"><div class="r-block"><div class="r-label">Approach</div><div style="color:var(--muted2);font-size:11px;line-height:1.7;">${data.approach}</div></div></div>`;
+  }
+
+  if ((data.remediationFirst||[]).length) {
+    html += `<div style="font-size:9px;letter-spacing:2px;color:var(--warn);margin-bottom:8px;text-transform:uppercase;">Remediation First</div>
+    <div class="cg-file-list">`;
+    data.remediationFirst.forEach(f => {
+      html += `<div class="cg-file"><span class="f-path">${f.file}</span><span class="f-action">FIX</span></div>`;
+      if (f.reason) html += `<div style="font-size:10px;color:var(--muted);padding:0 10px 4px 26px;">${f.reason}</div>`;
+    });
+    html += `</div>`;
+  } else {
+    if (mode === 'agent') html += `<div class="cg-problem">⚠ No remediation phase — agent jumps directly to build</div>`;
+  }
+
+  if ((data.adminFiles||[]).length) {
+    html += `<div style="font-size:9px;letter-spacing:2px;color:${col};margin:12px 0 8px;text-transform:uppercase;">Admin Files</div>
+    <div class="cg-file-list">`;
+    data.adminFiles.forEach(f => {
+      const hasRisk = f.uses && (f.uses.toLowerCase().includes('inline') || f.uses.toLowerCase().includes('copy') || f.uses.toLowerCase().includes('checkout'));
+      html += `<div class="cg-file">
+        <span class="f-path">${f.file}</span>
+        <span class="f-action">${f.purpose?.slice(0,20)||'CREATE'}</span>
+      </div>`;
+      if (f.uses) html += `<div style="font-size:10px;padding:0 10px 4px 26px;${hasRisk?'color:var(--danger)':'color:var(--muted)'};">uses: ${f.uses}</div>`;
+    });
+    html += `</div>`;
+  }
+
+  if ((data.keyDecisions||[]).length) {
+    html += `<div style="font-size:9px;letter-spacing:2px;color:var(--muted);margin:12px 0 8px;text-transform:uppercase;">Key Decisions</div>`;
+    data.keyDecisions.forEach(d => {
+      const isRisky = mode === 'agent' && (d.why?.toLowerCase().includes('existing') || d.why?.toLowerCase().includes('pattern') || d.why?.toLowerCase().includes('already'));
+      html += `<div style="padding:8px 10px;background:var(--card2);border-radius:5px;margin-bottom:6px;border-left:2px solid ${isRisky?'var(--danger)':col};">
+        <div style="font-size:11px;font-weight:700;color:${isRisky?'var(--danger)':col};margin-bottom:3px;">${d.decision}</div>
+        <div style="font-size:10px;color:var(--muted2);">${d.why}</div>
+        ${d.avoids?`<div style="font-size:10px;color:var(--muted);margin-top:2px;">avoids: ${d.avoids}</div>`:''}
+      </div>`;
+    });
+  }
+
+  el.innerHTML = html;
+}
+
+function renderPackage(elId, data, mode) {
+  const el = document.getElementById(elId);
+  const col = mode === 'llm' ? 'var(--llm)' : 'var(--agent)';
+  const remediation = data?.remediationFirst || [];
+  const adminFiles  = data?.adminFiles || [];
+  const total = remediation.length + adminFiles.length;
+
+  let html = `<div style="font-size:10px;color:var(--muted2);margin-bottom:12px;">
+    ${mode === 'llm'
+      ? `<span style="color:var(--dev)">Part A (${remediation.length} tasks) → Part B (${adminFiles.length} files)</span>`
+      : `<span style="color:var(--agent)">No Part A — ${adminFiles.length} files direct</span>${remediation.length === 0 ? ' <span style="color:var(--danger)">⚠ blockers unresolved</span>' : ''}`
+    }
+  </div>`;
+
+  if (remediation.length) {
+    html += `<div style="font-size:9px;letter-spacing:1px;color:var(--warn);margin-bottom:6px;text-transform:uppercase;">Part A — Remediation</div>`;
+    remediation.forEach((f,i) => {
+      html += `<div style="display:flex;gap:8px;padding:5px 8px;background:var(--card2);border-radius:4px;margin-bottom:3px;font-size:10px;">
+        <span style="color:var(--muted);min-width:20px;">${String(i+1).padStart(2,'0')}.</span>
+        <span style="color:var(--warn);flex:1;">${f.file}</span>
+        <span style="color:var(--warn);font-size:9px;">FIX</span>
+      </div>`;
+    });
+  } else if (mode === 'agent') {
+    html += `<div style="padding:8px 10px;background:var(--danger-dim);border:1px solid rgba(248,113,113,0.15);border-radius:5px;font-size:10px;color:var(--danger);margin-bottom:10px;">✗ No remediation — AuthGuard, hooks, types/ all unresolved before build starts</div>`;
+  }
+
+  html += `<div style="font-size:9px;letter-spacing:1px;color:${col};margin:10px 0 6px;text-transform:uppercase;">Part B — Admin Build</div>`;
+  adminFiles.forEach((f,i) => {
+    html += `<div style="display:flex;gap:8px;padding:5px 8px;background:var(--card2);border-radius:4px;margin-bottom:3px;font-size:10px;">
+      <span style="color:var(--muted);min-width:20px;">${String(i+1).padStart(2,'0')}.</span>
+      <span style="color:var(--info);flex:1;">${f.file||f.path||'?'}</span>
+      <span style="color:${col};font-size:9px;">CREATE</span>
+    </div>`;
+  });
+
+  el.innerHTML = html;
+}
+
+function renderCompTable(llm, agent) {
+  const llmRem   = (llm?.remediationFirst||[]).length;
+  const agentRem = (agent?.remediationFirst||[]).length;
+  const llmFiles  = (llm?.adminFiles||[]).length;
+  const agentFiles = (agent?.adminFiles||[]).length;
+
+  const llmHasExtract  = JSON.stringify(llm||{}).toLowerCase().includes('usesubscription') || JSON.stringify(llm||{}).toLowerCase().includes('usepayment');
+  const agentHasExtract= JSON.stringify(agent||{}).toLowerCase().includes('usesubscription') || JSON.stringify(agent||{}).toLowerCase().includes('usepayment');
+  const agentInline    = JSON.stringify(agent||{}).toLowerCase().includes('inline') || JSON.stringify(agent||{}).toLowerCase().includes('copy') || JSON.stringify(agent||{}).toLowerCase().includes('checkout');
+  const llmAuthGuard   = JSON.stringify(llm||{}).toLowerCase().includes('authguard');
+  const agentAuthGuard = JSON.stringify(agent||{}).toLowerCase().includes('authguard');
+  const llmTypes       = JSON.stringify(llm||{}).toLowerCase().includes('types/');
+  const agentTypes     = JSON.stringify(agent||{}).toLowerCase().includes('types/');
+
+  const rows = [
+    { metric:'Remediation phase', sub:'Before Admin build starts', llm: llmRem > 0 ? `✓ ${llmRem} tasks` : '✗ None', llmClass:'good', agent: agentRem > 0 ? `✓ ${agentRem} tasks` : '✗ Skipped', agentClass: agentRem > 0 ? 'good' : 'bad' },
+    { metric:'AuthGuard', sub:'Route protection for Admin', llm: llmAuthGuard ? '✓ Built first':'✓ Design spec referenced', llmClass:'good', agent: agentAuthGuard ? '~ Ad-hoc inline':'✗ Missing or inline', agentClass:'bad' },
+    { metric:'Shared hooks', sub:'useSubscription / usePayment', llm: llmHasExtract ? '✓ Extracted to hooks':'✓ Planned correctly', llmClass:'good', agent: agentInline ? '✗ Logic duplicated':'~ Pattern copied', agentClass:'bad' },
+    { metric:'Types folder', sub:'Shared type definitions', llm: llmTypes ? '✓ Created before Admin':'✓ Planned in design', llmClass:'good', agent: agentTypes ? '~ Inline types':'✗ Missing / inline', agentClass: agentTypes ? 'warn' : 'bad' },
+    { metric:'Admin files created', sub:'New files in Part B', llm:`${llmFiles} files`, llmClass:'', agent:`${agentFiles} files`, agentClass:'' },
+    { metric:'Blueprint fidelity', sub:'Aligns with original design intent', llm:'✓ High', llmClass:'good', agent:'✗ Low — follows drift patterns', agentClass:'bad' },
+    { metric:'Tech debt added', sub:'New problems introduced', llm:'✓ None', llmClass:'good', agent:'✗ Duplicated logic, inline types, weak auth', agentClass:'bad' },
+    { metric:'Estimated extra debug cycles', sub:'Before stable production', llm:'0', llmClass:'good', agent:'4–6 cycles', agentClass:'bad' },
+  ];
+
+  document.getElementById('comp-table-rows').innerHTML = rows.map(r => `
+    <div class="ct-row">
+      <div class="ct-metric">${r.metric}<small>${r.sub}</small></div>
+      <div class="ct-val ${r.llmClass}">${r.llm}</div>
+      <div class="ct-val ${r.agentClass}">${r.agent}</div>
+    </div>`).join('');
+}
+
+function switchSec(id, el) {
+  document.querySelectorAll('.sec').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('sec-' + id).classList.add('active');
+  if (el) el.classList.add('active');
+  window.scrollTo({ top: document.querySelector('.nav-tabs').offsetTop - 10, behavior: 'smooth' });
+}
+
+const counts = {};
+function tick(el, group) {
+  el.classList.toggle('checked');
+  const box = el.querySelector('.cl-box');
+  box.textContent = el.classList.contains('checked') ? '✓' : '';
+  // update progress
+  const card = el.closest('.checklist-card');
+  const total = card.querySelectorAll('.cl-item').length;
+  const done  = card.querySelectorAll('.cl-item.checked').length;
+  const prog  = card.querySelector('.cl-progress');
+  if (prog) prog.textContent = `${done} / ${total}`;
+}
+</script>
+</body>
+</html>

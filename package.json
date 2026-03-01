@@ -1,0 +1,9 @@
+{
+  "name": "llm-agent-architecture-lab",
+  "version": "1.0.0",
+  "description": "LLM vs Agent Architecture Lab — Part 2 Interactive Demo",
+  "private": true,
+  "engines": {
+    "node": ">=18.x"
+  }
+}
