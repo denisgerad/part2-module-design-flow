@@ -2,6 +2,10 @@
   "version": 2,
   "name": "llm-agent-architecture-lab",
 
+  "rewrites": [
+    { "source": "/", "destination": "/part2-developer-discipline-agent.html" }
+  ],
+
   "functions": {
     "api/mistral.js": {
       "maxDuration": 60
