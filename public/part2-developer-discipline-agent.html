@@ -1588,6 +1588,11 @@ function renderDesign(elId, data, mode) {
   const col = mode === 'llm' ? 'var(--llm)' : 'var(--agent)';
   if (!data) { el.innerHTML = `<div style="color:var(--danger);font-size:11px;">Failed to parse response</div>`; return; }
 
+  const esc = s => String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;');
+
   let html = '';
   if (data.approach) {
     html += `<div class="cg-reasoning"><div class="r-block"><div class="r-label">Approach</div><div style="color:var(--muted2);font-size:11px;line-height:1.7;">${data.approach}</div></div></div>`;
@@ -1609,12 +1614,17 @@ function renderDesign(elId, data, mode) {
     html += `<div style="font-size:9px;letter-spacing:2px;color:${col};margin:12px 0 8px;text-transform:uppercase;">Admin Files</div>
     <div class="cg-file-list">`;
     data.adminFiles.forEach(f => {
-      const hasRisk = f.uses && (f.uses.toLowerCase().includes('inline') || f.uses.toLowerCase().includes('copy') || f.uses.toLowerCase().includes('checkout'));
+      const usesRaw = f.uses;
+      const usesStr = typeof usesRaw === 'string'
+        ? usesRaw
+        : (usesRaw == null ? '' : (Array.isArray(usesRaw) ? usesRaw.join(', ') : String(usesRaw)));
+      const usesLower = usesStr.toLowerCase();
+      const hasRisk = usesStr && (usesLower.includes('inline') || usesLower.includes('copy') || usesLower.includes('checkout'));
       html += `<div class="cg-file">
-        <span class="f-path">${f.file}</span>
-        <span class="f-action">${f.purpose?.slice(0,20)||'CREATE'}</span>
+        <span class="f-path">${esc(f.file)}</span>
+        <span class="f-action">${esc(f.purpose?.slice(0,20) || 'CREATE')}</span>
       </div>`;
-      if (f.uses) html += `<div style="font-size:10px;padding:0 10px 4px 26px;${hasRisk?'color:var(--danger)':'color:var(--muted)'};">uses: ${f.uses}</div>`;
+      if (usesStr) html += `<div style="font-size:10px;padding:0 10px 4px 26px;${hasRisk ? 'color:var(--danger)' : 'color:var(--muted)'};">uses: ${esc(usesStr)}</div>`;
     });
     html += `</div>`;
   }
