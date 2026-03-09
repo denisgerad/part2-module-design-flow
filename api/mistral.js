@@ -2,53 +2,48 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Vercel Serverless Function — Mistral API Proxy
 //
-// WHY THIS EXISTS:
-//   Browsers cannot call the Mistral API directly because:
-//   1. CORS: Mistral's API does not allow browser origins
-//   2. Security: the API key must never appear in client-side code
-//
-// HOW IT WORKS:
-//   Browser → POST /api/mistral → this function → Mistral API
-//                                      ↓
-//   Browser ← JSON response    ← this function ← Mistral API
-//
-// ACCESS CODE GATE:
-//   The browser sends an X-Access-Code header with every request.
-//   This function checks it against the ACCESS_CODE env var.
-//   Wrong code → 401 before the Mistral API is ever called.
-//   Correct code → proxy forwards to Mistral as normal.
-//
 // ENVIRONMENT VARIABLES (set in Vercel project settings):
 //   MISTRAL_API_KEY   your Mistral API key
-//   ACCESS_CODE       any string you choose — shared with users you trust
+//   ACCESS_CODE       access gate — shared with users you trust
+//
+// ROUTES:
+//   GET  /api/mistral   — validate access code only (no Mistral call)
+//   POST /api/mistral   — proxy to Mistral chat completions
 // ─────────────────────────────────────────────────────────────────────────────
 
 const MISTRAL_API = 'https://api.mistral.ai/v1/chat/completions';
 
 export default async function handler(req, res) {
 
-  // ── CORS headers ────────────────────────────────────────────────────────────
+  // ── CORS headers ─────────────────────────────────────────────────────────────
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Access-Code');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  // ── Access code gate ────────────────────────────────────────────────────────
-  const accessCode    = process.env.ACCESS_CODE;
-  const providedCode  = req.headers['x-access-code'] || '';
+  // ── Shared access code check ──────────────────────────────────────────────────
+  const accessCode   = process.env.ACCESS_CODE;
+  const providedCode = req.headers['x-access-code'] || '';
 
   if (accessCode && providedCode !== accessCode) {
     return res.status(401).json({ error: 'Invalid access code' });
   }
 
-  // ── Validate Mistral API key ─────────────────────────────────────────────────
+  // ── GET — access code probe only, no Mistral call ─────────────────────────────
+  // The modal sends GET /api/mistral with X-Access-Code to validate the
+  // code cheaply. 200 = accepted, 401 = wrong (handled above).
+  if (req.method === 'GET') {
+    return res.status(200).json({ ok: true });
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  // ── Validate Mistral API key ──────────────────────────────────────────────────
   const apiKey = process.env.MISTRAL_API_KEY;
   if (!apiKey) {
     console.error('MISTRAL_API_KEY not set');
@@ -57,14 +52,14 @@ export default async function handler(req, res) {
     });
   }
 
-  // ── Extract request body ─────────────────────────────────────────────────────
+  // ── Extract request body ──────────────────────────────────────────────────────
   const { model, max_tokens, messages } = req.body;
 
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ error: 'Invalid request: messages array required' });
   }
 
-  // ── Forward to Mistral API ───────────────────────────────────────────────────
+  // ── Forward to Mistral API ────────────────────────────────────────────────────
   try {
     const mistralRes = await fetch(MISTRAL_API, {
       method: 'POST',

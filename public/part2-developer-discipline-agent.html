@@ -1351,7 +1351,7 @@ const API = '/api/mistral';
 // ── Access code ────────────────────────────────────────────────────────────
 // Stored in sessionStorage after the user passes the gate.
 // Sent as X-Access-Code header with every API call.
-// The serverless function validates it against the ACCESS_CODE env var.
+// Validated server-side against the ACCESS_CODE environment variable.
 
 let _accessCode = sessionStorage.getItem('access_code') || '';
 
@@ -1362,69 +1362,98 @@ function togglePw() {
 
 async function submitAccessCode() {
   const inp  = document.getElementById('access-input');
+  const btn  = document.querySelector('.access-btn');
   const code = inp.value.trim();
   const err  = document.getElementById('access-err');
   if (!code) { err.textContent = 'Please enter an access code.'; return; }
 
   err.textContent = '';
-  // Validate code by making a lightweight probe call to the proxy.
-  // The proxy returns 401 if the code is wrong, 400 if messages array
-  // is missing (which it will be here) — 400 means the key was accepted.
+  btn.textContent = 'Checking…';
+  btn.disabled = true;
+
+  // Probe uses GET — clean 200 (ok) or 401 (wrong code), no Mistral call made.
+  // This avoids the broken-POST approach that triggered extension interference.
   try {
     const r = await fetch(API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Access-Code': code },
-      body: JSON.stringify({ messages: [] }),   // intentionally empty → 400
+      method:  'GET',
+      headers: { 'X-Access-Code': code },
     });
+
     if (r.status === 401) {
       inp.classList.add('error');
       setTimeout(() => inp.classList.remove('error'), 600);
       err.textContent = 'Incorrect access code. Try again.';
+      btn.textContent = 'ENTER →';
+      btn.disabled = false;
       return;
     }
-    // 400 (bad request) means the code was accepted — server reached Mistral check
+
+    if (!r.ok) {
+      // Unexpected server error — still accept the code and let real calls fail loudly
+      console.warn('Probe returned', r.status, '— proceeding anyway');
+    }
+
     _accessCode = code;
     sessionStorage.setItem('access_code', code);
     document.getElementById('access-overlay').classList.add('hidden');
+
   } catch (e) {
-    err.textContent = 'Network error — check your connection.';
+    // fetch() itself threw — usually a browser extension (SES lockdown,
+    // ad-blocker, wallet) aborting the request before it completes.
+    // Show a helpful message and let the user try anyway.
+    console.warn('Access probe fetch error:', e);
+    err.textContent = 'Could not reach server. Check extensions / VPN, then try again.';
+    btn.textContent = 'ENTER →';
+    btn.disabled = false;
   }
 }
 
-// Allow Enter key in access input
+// Allow Enter key in the access input
 document.addEventListener('DOMContentLoaded', () => {
   const inp = document.getElementById('access-input');
   if (inp) {
     inp.addEventListener('keydown', e => { if (e.key === 'Enter') submitAccessCode(); });
   }
-  // If we already have a session code, skip the dialog
+  // Skip dialog if code is already in sessionStorage
   if (_accessCode) {
     document.getElementById('access-overlay').classList.add('hidden');
   }
 });
 
 // ── Mistral API call ───────────────────────────────────────────────────────
-// Drop-in replacement for callMistral(system, user).
-// Mistral uses messages array with role:"system" + role:"user".
-// Response shape: choices[0].message.content  (string, not array of blocks).
+// Mistral request shape:  messages array with role:"system" + role:"user"
+// Mistral response shape: choices[0].message.content  (plain string)
+// X-Access-Code sent on every call — validated server-side.
 
 async function callMistral(system, user) {
-  const r = await fetch(API, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Access-Code': _accessCode },
-    body: JSON.stringify({
-      model:      'mistral-large-latest',
-      max_tokens: 3000,
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user',   content: user   },
-      ],
-    }),
-  });
-  if (r.status === 401) throw new Error('Invalid access code — please reload and re-enter.');
-  if (!r.ok) throw new Error(`API ${r.status}`);
+  let r;
+  try {
+    r = await fetch(API, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Access-Code': _accessCode },
+      body: JSON.stringify({
+        model:      'mistral-large-latest',
+        max_tokens: 3000,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user',   content: user   },
+        ],
+      }),
+    });
+  } catch (fetchErr) {
+    // fetch() threw before we got any response — extension interference or network down
+    throw new Error(
+      'Request blocked before reaching server. ' +
+      'Try disabling browser extensions (ad-blockers, wallets) or use an incognito window. ' +
+      'Details: ' + fetchErr.message
+    );
+  }
+  if (r.status === 401) {
+    sessionStorage.removeItem('access_code');
+    throw new Error('Access code rejected — reload the page and re-enter your code.');
+  }
+  if (!r.ok) throw new Error('API error ' + r.status);
   const d = await r.json();
-  // Mistral: d.choices[0].message.content is a plain string
   return d.choices?.[0]?.message?.content || '';
 }
 

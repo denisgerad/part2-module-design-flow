@@ -1,17 +1,12 @@
 {
   "version": 2,
-  "name": "module-design-flow",
-  "outputDirectory": "public",
+  "name": "llm-agent-architecture-lab",
 
   "functions": {
     "api/mistral.js": {
       "maxDuration": 60
     }
   },
-
-  "rewrites": [
-    { "source": "/", "destination": "/part2-developer-discipline-agent.html" }
-  ],
 
   "headers": [
     {
